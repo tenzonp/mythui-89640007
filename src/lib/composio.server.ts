@@ -62,21 +62,27 @@ export async function initiateConnection(args: {
 }) {
   const authConfigId = await getOrCreateManagedAuthConfig(args.toolkitSlug);
   const res = await call<{
-    id: string;
-    status: string;
+    id?: string;
+    connected_account_id?: string;
+    status?: string;
     redirect_url?: string;
+    redirect_uri?: string;
     connection_data?: { val?: { redirectUrl?: string } };
-  }>(`/connected_accounts`, {
+  }>(`/connected_accounts/link`, {
     method: "POST",
     body: JSON.stringify({
-      auth_config: { id: authConfigId },
-      connection: { user_id: args.userId, callback_url: args.callbackUrl },
+      auth_config_id: authConfigId,
+      user_id: args.userId,
+      callback_url: args.callbackUrl,
     }),
   });
   return {
-    id: res.id,
-    status: res.status,
-    redirectUrl: res.redirect_url || res.connection_data?.val?.redirectUrl,
+    id: (res.connected_account_id || res.id) as string,
+    status: res.status ?? "INITIATED",
+    redirectUrl:
+      res.redirect_url ||
+      res.redirect_uri ||
+      res.connection_data?.val?.redirectUrl,
   };
 }
 
