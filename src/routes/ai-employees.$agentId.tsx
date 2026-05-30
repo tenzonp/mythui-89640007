@@ -50,7 +50,7 @@ function AgentPage() {
             <div className="mt-10">
               <div className="text-[11px] tracking-[0.18em] font-semibold mb-4">CORE SKILLS</div>
               <div className="space-y-2">
-                {agent.skills.map(s => (
+                {agent.skills.map((s: string) => (
                   <div key={s} className="flex items-center gap-3">
                     <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: agent.accentSoft }}>
                       <Check className="w-3 h-3" style={{ color: agent.accent }} />
