@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      composio_connections: {
+        Row: {
+          connected_account_id: string | null
+          created_at: string
+          id: string
+          redirect_url: string | null
+          status: string
+          toolkit_slug: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connected_account_id?: string | null
+          created_at?: string
+          id?: string
+          redirect_url?: string | null
+          status?: string
+          toolkit_slug: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connected_account_id?: string | null
+          created_at?: string
+          id?: string
+          redirect_url?: string | null
+          status?: string
+          toolkit_slug?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          created_at: string
+          id: string
+          parts: Json
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parts: Json
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -38,6 +106,30 @@ export type Database = {
           email?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
