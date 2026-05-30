@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
   convertToModelMessages,
+  jsonSchema,
   stepCountIs,
   streamText,
   tool,
   type UIMessage,
 } from "ai";
-import { z } from "zod";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -15,23 +15,24 @@ import {
   type ComposioTool,
 } from "@/lib/composio.server";
 
-function jsonSchemaToZod(schema: any): z.ZodTypeAny {
-  // Lightweight passthrough — let AI SDK forward JSON schema via z.any().
-  // For richer typing one could expand this. Here, accept any object input.
-  return z.any();
-}
-
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
     const safeName = t.slug.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
+    // Composio returns a JSON Schema in input_parameters. Without a real schema
+    // the model can't pass arguments, so tools end up called with empty input
+    // and fail (e.g. Gmail "missing required field"). Forward the schema.
+    const raw =
+      t.input_parameters && typeof t.input_parameters === "object"
+        ? (t.input_parameters as any)
+        : { type: "object", properties: {} };
+    const schema = raw.type ? raw : { type: "object", properties: raw };
     out[safeName] = tool({
-      description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}`.slice(0, 500),
-      inputSchema: jsonSchemaToZod(t.input_parameters),
+      description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}`.slice(0, 1000),
+      inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
         try {
-          const res = await executeTool(t.slug, userId, args);
-          return res;
+          return await executeTool(t.slug, userId, args ?? {});
         } catch (e: any) {
           return { error: String(e?.message ?? e) };
         }
