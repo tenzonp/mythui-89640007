@@ -70,11 +70,12 @@ function ChatWindow({
     }),
   });
 
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, status, error, setMessages } = useChat({
     id: threadId,
     messages: initial,
     transport,
   });
+  const fnDeleteMsg = useServerFn(deleteMessage);
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
