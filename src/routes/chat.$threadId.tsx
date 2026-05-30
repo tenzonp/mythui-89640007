@@ -117,7 +117,16 @@ function ChatWindow({
         <div className="max-w-[760px] mx-auto px-6 py-8 space-y-6">
           {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
           {messages.map((m) => (
-            <Message key={m.id} m={m} />
+            <Message
+              key={m.id}
+              m={m}
+              onDelete={async () => {
+                setMessages((prev) => prev.filter((x) => x.id !== m.id));
+                try {
+                  await fnDeleteMsg({ data: { id: m.id } });
+                } catch {}
+              }}
+            />
           ))}
           {busy && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="text-sm text-muted-foreground flex items-center gap-2">
