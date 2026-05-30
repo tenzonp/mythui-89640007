@@ -101,7 +101,7 @@ function Dashboard() {
                 className="group rounded-xl border bg-card p-5 hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center gap-4">
-                  <img src={a.avatar} alt={a.name} className="w-14 h-14 rounded-full object-cover ring-2" style={{ boxShadow: `0 0 0 2px ${a.accent}` }} />
+                  <img src={a.image} alt={a.name} className="w-14 h-14 rounded-full object-cover ring-2" style={{ boxShadow: `0 0 0 2px ${a.accent}` }} />
                   <div>
                     <div className="font-medium">{a.name}</div>
                     <div className="text-xs text-muted-foreground">{a.role}</div>
