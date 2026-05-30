@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUpRight, ArrowRight, Play, ChevronLeft, ChevronRight, Home, LayoutGrid, MessageSquare, TrendingUp, Settings, Grid3x3 } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowUpRight, ArrowRight, Play, ChevronLeft, ChevronRight, Home, LayoutGrid, MessageSquare, TrendingUp, Settings } from "lucide-react";
 import { JellyBlob } from "@/components/JellyBlob";
-import { AgentIcon } from "@/components/AgentIcon";
+import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
+import { agents } from "@/data/agents";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,38 +21,17 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const agents = [
-  { name: "Marketing", desc: "Builds campaigns that attract and convert.", variant: "marketing" as const },
-  { name: "Research", desc: "Finds insights that drive decisions.", variant: "research" as const },
-  { name: "Design", desc: "Creates visuals that inspire action.", variant: "design" as const },
-  { name: "Sales", desc: "Nurtures leads and closes more deals.", variant: "sales" as const },
-  { name: "Operations", desc: "Automates work and keeps everything smooth.", variant: "operations" as const },
-];
-
 const tasks = [
-  { title: "Summer campaign strategy", agent: "Marketing Agent", status: "In progress", color: "oklch(0.7 0.2 285)" },
-  { title: "Competitor research", agent: "Research Agent", status: "In progress", color: "oklch(0.6 0.18 250)" },
-  { title: "Landing page concept", agent: "Design Agent", status: "Review", color: "oklch(0.7 0.2 350)" },
-  { title: "Lead scoring automation", agent: "Sales Agent", status: "Completed", color: "oklch(0.65 0.18 150)" },
+  { title: "Summer campaign strategy", agent: "Nova — Marketing", status: "In progress", color: "oklch(0.7 0.2 285)" },
+  { title: "Competitor research", agent: "Orion — Research", status: "In progress", color: "oklch(0.6 0.18 250)" },
+  { title: "Landing page concept", agent: "Iris — Design", status: "Review", color: "oklch(0.7 0.2 350)" },
+  { title: "Lead scoring automation", agent: "Atlas — Sales", status: "Completed", color: "oklch(0.65 0.18 150)" },
 ];
 
 function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Nav */}
-      <header className="max-w-[1240px] mx-auto px-8 pt-8 flex items-center justify-between">
-        <div className="font-serif text-2xl tracking-tight">mythmind<span className="text-violet">.</span></div>
-        <nav className="hidden md:flex items-center gap-10 text-[11px] tracking-[0.18em] font-medium text-foreground/80">
-          <a href="#agents">AI EMPLOYEES</a>
-          <a href="#solutions">SOLUTIONS</a>
-          <a href="#about">ABOUT</a>
-          <a href="#pricing">PRICING</a>
-          <a href="#resources">RESOURCES</a>
-        </nav>
-        <button className="w-11 h-11 rounded-full bg-ink text-white flex items-center justify-center" style={{ background: "var(--ink)" }}>
-          <Grid3x3 className="w-4 h-4 text-white" />
-        </button>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section className="max-w-[1240px] mx-auto px-8 pt-20 pb-24 grid md:grid-cols-2 gap-12 items-center">
@@ -65,8 +45,8 @@ function Index() {
           <p className="mt-8 text-muted-foreground max-w-md leading-relaxed">
             Mythmind brings together a team of AI employees that think, plan, and execute — so you can focus on what really matters.
           </p>
-          <div className="mt-12 flex items-center gap-10">
-            <a href="#" className="flex items-center gap-4 group">
+          <div className="mt-12 flex items-center gap-10 flex-wrap">
+            <Link to="/ai-employees" className="flex items-center gap-4 group">
               <span className="w-12 h-12 rounded-full flex items-center justify-center text-white transition-transform group-hover:scale-105" style={{ background: "var(--ink)" }}>
                 <ArrowUpRight className="w-5 h-5" />
               </span>
@@ -74,7 +54,7 @@ function Index() {
                 <div className="text-[11px] tracking-[0.18em] font-semibold">LAUNCH WORKSPACE</div>
                 <div className="text-xs text-muted-foreground mt-0.5">Start building with your AI team</div>
               </span>
-            </a>
+            </Link>
             <a href="#" className="flex items-center gap-3 group">
               <span>
                 <div className="text-[11px] tracking-[0.18em] font-semibold">WATCH FILM</div>
@@ -94,7 +74,7 @@ function Index() {
       {/* Agents */}
       <section id="agents" className="bg-surface py-24">
         <div className="max-w-[1240px] mx-auto px-8">
-          <div className="flex items-start justify-between mb-16">
+          <div className="flex items-start justify-between mb-16 flex-wrap gap-6">
             <div>
               <div className="text-violet text-[11px] tracking-[0.22em] font-semibold mb-6">BUILT DIFFERENT</div>
               <h2 className="font-serif text-5xl leading-[1.1] max-w-md">
@@ -109,20 +89,28 @@ function Index() {
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {agents.map((a) => (
-              <div key={a.name} className="bg-background rounded-2xl p-6 border border-border/40 hover:shadow-lg transition-all hover:-translate-y-1 group">
-                <div className="flex justify-center mb-8 animate-float">
-                  <AgentIcon variant={a.variant} />
+              <Link
+                key={a.id}
+                to="/ai-employees/$agentId"
+                params={{ agentId: a.id }}
+                className="bg-background rounded-2xl p-6 border border-border/40 hover:shadow-xl transition-all hover:-translate-y-1 group"
+              >
+                <div className="relative mx-auto mb-5 w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-md animate-float"
+                     style={{ background: a.accentSoft }}>
+                  <img src={a.image} alt={a.name} loading="lazy" width={512} height={512} className="w-full h-full object-cover" />
                 </div>
-                <h3 className="font-semibold text-base mb-3">{a.name}<br />Agent</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-8">{a.desc}</p>
-                <ArrowRight className="w-4 h-4 text-foreground/70 group-hover:translate-x-1 transition-transform" />
-              </div>
+                <div className="text-center text-[10px] tracking-[0.18em] font-semibold mb-1" style={{ color: a.accent }}>{a.name.split(" ")[0].toUpperCase()}</div>
+                <h3 className="font-semibold text-base text-center mb-3">{a.role}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed text-center mb-6">{a.tagline}</p>
+                <div className="flex justify-center">
+                  <ArrowRight className="w-4 h-4 text-foreground/70 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
             ))}
           </div>
 
           {/* Dashboard preview */}
           <div className="mt-8 grid md:grid-cols-[80px_1fr_1.3fr] gap-4">
-            {/* Sidebar */}
             <div className="bg-background rounded-2xl border border-border/40 p-4 flex flex-col items-center gap-6 py-6">
               <div className="font-serif text-2xl">m<span className="text-violet">.</span></div>
               <div className="flex flex-col gap-4 mt-4">
@@ -135,10 +123,9 @@ function Index() {
               <button className="mt-auto w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground"><Settings className="w-4 h-4" /></button>
             </div>
 
-            {/* Tasks */}
             <div className="bg-background rounded-2xl border border-border/40 p-6">
               <div className="mb-1 font-semibold">Good morning, Arjun ☀️</div>
-              <div className="text-xs text-muted-foreground mb-5">Here's what's your team is working on.</div>
+              <div className="text-xs text-muted-foreground mb-5">Here's what your team is working on.</div>
               <div className="space-y-2">
                 {tasks.map((t) => (
                   <div key={t.title} className="flex items-center justify-between p-3 rounded-xl hover:bg-surface transition-colors">
@@ -151,11 +138,7 @@ function Index() {
                         <div className="text-[11px] text-muted-foreground">{t.agent}</div>
                       </div>
                     </div>
-                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
-                      t.status === "Completed" ? "bg-green-100 text-green-700" :
-                      t.status === "Review" ? "bg-orange-100 text-orange-700" :
-                      "bg-violet-100 text-violet-700"
-                    }`} style={
+                    <span className="text-[10px] px-2.5 py-1 rounded-full font-medium" style={
                       t.status === "Completed" ? { background: "oklch(0.93 0.08 150)", color: "oklch(0.4 0.15 150)" } :
                       t.status === "Review" ? { background: "oklch(0.93 0.08 60)", color: "oklch(0.5 0.18 50)" } :
                       { background: "oklch(0.93 0.05 285)", color: "oklch(0.45 0.2 285)" }
@@ -163,12 +146,11 @@ function Index() {
                   </div>
                 ))}
               </div>
-              <button className="mt-5 w-full flex items-center justify-between pt-4 border-t border-border/40 text-[11px] tracking-[0.18em] font-semibold">
+              <Link to="/ai-employees" className="mt-5 w-full flex items-center justify-between pt-4 border-t border-border/40 text-[11px] tracking-[0.18em] font-semibold">
                 VIEW ALL TASKS <ArrowRight className="w-4 h-4" />
-              </button>
+              </Link>
             </div>
 
-            {/* Performance */}
             <div className="bg-background rounded-2xl border border-border/40 p-6 relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <div className="font-semibold">Performance overview</div>
@@ -218,14 +200,16 @@ function Index() {
               <h3 className="font-serif text-4xl text-white leading-tight">
                 Not just AI.<br />An AI workforce.
               </h3>
-              <button className="mt-8 w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center text-white">
+              <Link to="/ai-employees" className="mt-8 inline-flex w-12 h-12 rounded-full bg-white/10 backdrop-blur items-center justify-center text-white">
                 <ArrowRight className="w-5 h-5" />
-              </button>
+              </Link>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex -space-x-3">
-                {["oklch(0.7 0.15 30)","oklch(0.65 0.1 50)","oklch(0.75 0.1 20)","oklch(0.6 0.12 40)"].map((c,i) => (
-                  <div key={i} className="w-10 h-10 rounded-full border-2 border-ink" style={{ background: `linear-gradient(135deg, ${c}, oklch(0.5 0.1 30))` }} />
+                {agents.slice(0,4).map((a) => (
+                  <div key={a.id} className="w-10 h-10 rounded-full border-2 overflow-hidden" style={{ borderColor: "oklch(0.13 0.02 270)" }}>
+                    <img src={a.image} alt={a.name} className="w-full h-full object-cover" />
+                  </div>
                 ))}
               </div>
               <div className="text-white/80 text-sm leading-relaxed max-w-[220px]">
@@ -236,10 +220,7 @@ function Index() {
         </div>
       </section>
 
-      <footer className="max-w-[1240px] mx-auto px-8 py-12 text-xs text-muted-foreground flex justify-between">
-        <div>© 2026 Mythmind</div>
-        <div>AI Workforce OS</div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

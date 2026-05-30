@@ -9,38 +9,148 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SolutionsRouteImport } from './routes/solutions'
+import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AiEmployeesIndexRouteImport } from './routes/ai-employees.index'
+import { Route as AiEmployeesAgentIdRouteImport } from './routes/ai-employees.$agentId'
 
+const SolutionsRoute = SolutionsRouteImport.update({
+  id: '/solutions',
+  path: '/solutions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiEmployeesIndexRoute = AiEmployeesIndexRouteImport.update({
+  id: '/ai-employees/',
+  path: '/ai-employees/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiEmployeesAgentIdRoute = AiEmployeesAgentIdRouteImport.update({
+  id: '/ai-employees/$agentId',
+  path: '/ai-employees/$agentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/pricing': typeof PricingRoute
+  '/resources': typeof ResourcesRoute
+  '/solutions': typeof SolutionsRoute
+  '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
+  '/ai-employees/': typeof AiEmployeesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/pricing': typeof PricingRoute
+  '/resources': typeof ResourcesRoute
+  '/solutions': typeof SolutionsRoute
+  '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
+  '/ai-employees': typeof AiEmployeesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/pricing': typeof PricingRoute
+  '/resources': typeof ResourcesRoute
+  '/solutions': typeof SolutionsRoute
+  '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
+  '/ai-employees/': typeof AiEmployeesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/pricing'
+    | '/resources'
+    | '/solutions'
+    | '/ai-employees/$agentId'
+    | '/ai-employees/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/about'
+    | '/pricing'
+    | '/resources'
+    | '/solutions'
+    | '/ai-employees/$agentId'
+    | '/ai-employees'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/pricing'
+    | '/resources'
+    | '/solutions'
+    | '/ai-employees/$agentId'
+    | '/ai-employees/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  PricingRoute: typeof PricingRoute
+  ResourcesRoute: typeof ResourcesRoute
+  SolutionsRoute: typeof SolutionsRoute
+  AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
+  AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/solutions': {
+      id: '/solutions'
+      path: '/solutions'
+      fullPath: '/solutions'
+      preLoaderRoute: typeof SolutionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +158,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-employees/': {
+      id: '/ai-employees/'
+      path: '/ai-employees'
+      fullPath: '/ai-employees/'
+      preLoaderRoute: typeof AiEmployeesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-employees/$agentId': {
+      id: '/ai-employees/$agentId'
+      path: '/ai-employees/$agentId'
+      fullPath: '/ai-employees/$agentId'
+      preLoaderRoute: typeof AiEmployeesAgentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  PricingRoute: PricingRoute,
+  ResourcesRoute: ResourcesRoute,
+  SolutionsRoute: SolutionsRoute,
+  AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,
+  AiEmployeesIndexRoute: AiEmployeesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
