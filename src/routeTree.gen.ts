@@ -12,11 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SolutionsRouteImport } from './routes/solutions'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as AiEmployeesIndexRouteImport } from './routes/ai-employees.index'
+import { Route as ChatThreadIdRouteImport } from './routes/chat.$threadId'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AiEmployeesAgentIdRouteImport } from './routes/ai-employees.$agentId'
 
 const SolutionsRoute = SolutionsRouteImport.update({
@@ -34,9 +39,19 @@ const PricingRoute = PricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IntegrationsRoute = IntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -54,9 +69,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ChatRoute,
+} as any)
 const AiEmployeesIndexRoute = AiEmployeesIndexRouteImport.update({
   id: '/ai-employees/',
   path: '/ai-employees/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatThreadIdRoute = ChatThreadIdRouteImport.update({
+  id: '/$threadId',
+  path: '/$threadId',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AiEmployeesAgentIdRoute = AiEmployeesAgentIdRouteImport.update({
@@ -69,35 +99,49 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/chat': typeof ChatRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
+  '/api/chat': typeof ApiChatRoute
+  '/chat/$threadId': typeof ChatThreadIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
+  '/chat/': typeof ChatIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
+  '/api/chat': typeof ApiChatRoute
+  '/chat/$threadId': typeof ChatThreadIdRoute
   '/ai-employees': typeof AiEmployeesIndexRoute
+  '/chat': typeof ChatIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/chat': typeof ChatRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
+  '/api/chat': typeof ApiChatRoute
+  '/chat/$threadId': typeof ChatThreadIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
+  '/chat/': typeof ChatIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -105,45 +149,62 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/chat'
     | '/dashboard'
+    | '/integrations'
     | '/pricing'
     | '/resources'
     | '/solutions'
     | '/ai-employees/$agentId'
+    | '/api/chat'
+    | '/chat/$threadId'
     | '/ai-employees/'
+    | '/chat/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/auth'
     | '/dashboard'
+    | '/integrations'
     | '/pricing'
     | '/resources'
     | '/solutions'
     | '/ai-employees/$agentId'
+    | '/api/chat'
+    | '/chat/$threadId'
     | '/ai-employees'
+    | '/chat'
   id:
     | '__root__'
     | '/'
     | '/about'
     | '/auth'
+    | '/chat'
     | '/dashboard'
+    | '/integrations'
     | '/pricing'
     | '/resources'
     | '/solutions'
     | '/ai-employees/$agentId'
+    | '/api/chat'
+    | '/chat/$threadId'
     | '/ai-employees/'
+    | '/chat/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
+  ChatRoute: typeof ChatRouteWithChildren
   DashboardRoute: typeof DashboardRoute
+  IntegrationsRoute: typeof IntegrationsRoute
   PricingRoute: typeof PricingRoute
   ResourcesRoute: typeof ResourcesRoute
   SolutionsRoute: typeof SolutionsRoute
   AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
+  ApiChatRoute: typeof ApiChatRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
 }
 
@@ -170,11 +231,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integrations': {
+      id: '/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -198,11 +273,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chat/': {
+      id: '/chat/'
+      path: '/'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof ChatRoute
+    }
     '/ai-employees/': {
       id: '/ai-employees/'
       path: '/ai-employees'
       fullPath: '/ai-employees/'
       preLoaderRoute: typeof AiEmployeesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/$threadId': {
+      id: '/chat/$threadId'
+      path: '/$threadId'
+      fullPath: '/chat/$threadId'
+      preLoaderRoute: typeof ChatThreadIdRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ai-employees/$agentId': {
@@ -215,15 +311,30 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ChatRouteChildren {
+  ChatThreadIdRoute: typeof ChatThreadIdRoute
+  ChatIndexRoute: typeof ChatIndexRoute
+}
+
+const ChatRouteChildren: ChatRouteChildren = {
+  ChatThreadIdRoute: ChatThreadIdRoute,
+  ChatIndexRoute: ChatIndexRoute,
+}
+
+const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
+  ChatRoute: ChatRouteWithChildren,
   DashboardRoute: DashboardRoute,
+  IntegrationsRoute: IntegrationsRoute,
   PricingRoute: PricingRoute,
   ResourcesRoute: ResourcesRoute,
   SolutionsRoute: SolutionsRoute,
   AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,
+  ApiChatRoute: ApiChatRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
 }
 export const routeTree = rootRouteImport

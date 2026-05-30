@@ -16,6 +16,8 @@ import {
   Settings,
   Zap,
   ChevronRight,
+  MessageSquare,
+  Plug,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
@@ -27,6 +29,8 @@ type Profile = { display_name: string | null; email: string | null; avatar_url: 
 
 const sidebarLinks = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
+  { to: "/integrations", label: "Integrations", icon: Plug },
   { to: "/ai-employees", label: "AI Employees", icon: Users },
   { to: "/solutions", label: "Solutions", icon: Briefcase },
   { to: "/pricing", label: "Billing", icon: Zap },
