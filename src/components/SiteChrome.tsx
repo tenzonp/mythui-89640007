@@ -27,12 +27,14 @@ export function SiteHeader() {
           </Link>
         ))}
       </nav>
-      <button className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "var(--ink)" }}>
-        <Grid3x3 className="w-4 h-4 text-white" />
-      </button>
-    </header>
-  );
-}
+      <div className="flex items-center gap-3">
+        <Link to="/auth" className="hidden md:inline text-[11px] tracking-[0.18em] font-medium hover:text-violet transition-colors">
+          SIGN IN
+        </Link>
+        <button className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "var(--ink)" }}>
+          <Grid3x3 className="w-4 h-4 text-white" />
+        </button>
+      </div>
 
 export function SiteFooter() {
   return (
