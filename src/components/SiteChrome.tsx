@@ -35,6 +35,10 @@ export function SiteHeader() {
           <Grid3x3 className="w-4 h-4 text-white" />
         </button>
       </div>
+    </header>
+  );
+}
+
 
 export function SiteFooter() {
   return (
