@@ -208,19 +208,21 @@ function EmptyState({ onPick }: { onPick: (t: string) => void }) {
   );
 }
 
-function Message({ m }: { m: UIMessage }) {
+function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
+  const text = m.parts.map((p: any) => (p.type === "text" ? p.text : "")).join("");
+
   if (m.role === "user") {
-    const text = m.parts.map((p: any) => (p.type === "text" ? p.text : "")).join("");
     return (
-      <div className="flex justify-end">
+      <div className="group flex flex-col items-end gap-1">
         <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
           {text}
         </div>
+        <MessageActions text={text} onDelete={onDelete} role="user" />
       </div>
     );
   }
   return (
-    <div className="space-y-3">
+    <div className="group space-y-3">
       {m.parts.map((p: any, i: number) => {
         if (p.type === "text") {
           return (
@@ -234,7 +236,92 @@ function Message({ m }: { m: UIMessage }) {
         }
         return null;
       })}
+      <MessageActions text={text} onDelete={onDelete} role="assistant" />
     </div>
+  );
+}
+
+function MessageActions({
+  text,
+  onDelete,
+  role,
+}: {
+  text: string;
+  onDelete: () => void;
+  role: "user" | "assistant";
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
+
+  const share = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        toast.success("Copied — share anywhere");
+      }
+    } catch {}
+  };
+
+  const report = () => toast.success("Thanks — feedback noted");
+
+  return (
+    <div
+      className={`opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ${
+        role === "user" ? "justify-end" : ""
+      }`}
+    >
+      <ActionBtn label="Copy" onClick={copy}>
+        {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+      </ActionBtn>
+      <ActionBtn label="Share" onClick={share}>
+        <Share2 className="w-3.5 h-3.5" />
+      </ActionBtn>
+      {role === "assistant" && (
+        <ActionBtn label="Report" onClick={report}>
+          <Flag className="w-3.5 h-3.5" />
+        </ActionBtn>
+      )}
+      <ActionBtn label="Delete" onClick={onDelete} danger>
+        <Trash2 className="w-3.5 h-3.5" />
+      </ActionBtn>
+    </div>
+  );
+}
+
+function ActionBtn({
+  children,
+  onClick,
+  label,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  label: string;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className={`p-1.5 rounded-md text-muted-foreground hover:bg-accent ${
+        danger ? "hover:text-destructive" : "hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
