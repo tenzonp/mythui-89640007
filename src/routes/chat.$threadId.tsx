@@ -3,11 +3,12 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getThreadMessages, listMyConnections } from "@/lib/chat.functions";
+import { getThreadMessages, listMyConnections, deleteMessage } from "@/lib/chat.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown } from "lucide-react";
+import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown, Copy, Share2, Trash2, Flag, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/chat/$threadId")({
   component: ChatThread,
