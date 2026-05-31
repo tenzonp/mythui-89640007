@@ -109,12 +109,24 @@ export type ComposioTool = {
 
 export async function listToolsForToolkits(userId: string, toolkitSlugs: string[], limit = 30) {
   if (!toolkitSlugs.length) return { items: [] as ComposioTool[] };
-  const params = new URLSearchParams({
-    toolkit_slugs: toolkitSlugs.join(","),
-    user_id: userId,
-    limit: String(limit),
-  });
-  return call<{ items: ComposioTool[] }>(`/tools?${params}`);
+  // Composio v3 /tools filters by a single `toolkit_slug`; iterate per toolkit.
+  const all: ComposioTool[] = [];
+  await Promise.all(
+    toolkitSlugs.map(async (slug) => {
+      const params = new URLSearchParams({
+        toolkit_slug: slug,
+        user_id: userId,
+        limit: String(limit),
+      });
+      try {
+        const res = await call<{ items: ComposioTool[] }>(`/tools?${params}`);
+        for (const t of res.items ?? []) all.push(t);
+      } catch (e) {
+        console.error(`Composio tools fetch failed for ${slug}`, e);
+      }
+    }),
+  );
+  return { items: all };
 }
 
 export async function executeTool(slug: string, userId: string, args: any) {
