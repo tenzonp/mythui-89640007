@@ -1,8 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { ArrowUpRight, ArrowRight, Play, ChevronLeft, ChevronRight, Home, LayoutGrid, MessageSquare, TrendingUp, Settings } from "lucide-react";
 import { JellyBlob } from "@/components/JellyBlob";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { agents } from "@/data/agents";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,6 +31,12 @@ const tasks = [
 ];
 
 function Index() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!loading && user) navigate({ to: "/dashboard", replace: true });
+  }, [user, loading]);
+  if (loading || user) return null;
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
