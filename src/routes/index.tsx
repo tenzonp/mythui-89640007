@@ -31,6 +31,12 @@ const tasks = [
 ];
 
 function Index() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!loading && user) navigate({ to: "/dashboard", replace: true });
+  }, [user, loading]);
+  if (loading || user) return null;
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
