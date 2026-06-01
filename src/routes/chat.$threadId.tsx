@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getThreadMessages, listMyConnections, deleteMessage } from "@/lib/chat.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown, Copy, Share2, Trash2, Flag, Check } from "lucide-react";
+import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown, Copy, Share2, Trash2, Flag, Check, ArrowRight, Brain, CheckCircle2, AlertCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -145,11 +145,14 @@ function ChatWindow({
             className="ml-2 text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
             aria-label="Choose employee"
           >
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} — {a.role}
-              </option>
-            ))}
+            <option value="lin">Lin — CEO (auto-routes the team)</option>
+            {agents
+              .filter((a) => a.id !== "lin")
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} — {a.role} (direct)
+                </option>
+              ))}
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -387,8 +390,15 @@ function ActionBtn({
 }
 
 function ToolCall({ part }: { part: any }) {
-  const [open, setOpen] = useState(false);
   const name = part.type?.replace(/^tool-/, "") ?? "tool";
+  if (name === "delegate_to_employee") {
+    return <DelegationCard part={part} />;
+  }
+  return <GenericToolCall part={part} name={name} />;
+}
+
+function GenericToolCall({ part, name }: { part: any; name: string }) {
+  const [open, setOpen] = useState(false);
   const state = part.state ?? "input-streaming";
   const statusLabel =
     state === "output-available"
@@ -426,4 +436,147 @@ function ToolCall({ part }: { part: any }) {
       )}
     </div>
   );
+}
+
+function DelegationCard({ part }: { part: any }) {
+  const state = part.state ?? "input-streaming";
+  const input = part.input ?? {};
+  const output = part.output ?? {};
+  const employeeId: string | undefined = output.employee_id ?? input.employee;
+  const sub = employeeId ? getAgent(employeeId) : undefined;
+  const lin = getAgent("lin")!;
+  const timeline: any[] = Array.isArray(output.timeline) ? output.timeline : [];
+  const running = state !== "output-available" && state !== "output-error";
+
+  return (
+    <div className="border rounded-2xl bg-gradient-to-br from-muted/40 to-background overflow-hidden">
+      <div className="px-4 py-3 flex items-center gap-3 border-b bg-background/60">
+        <img src={lin.image} alt="Lin" className="w-7 h-7 rounded-full object-cover ring-2"
+             style={{ boxShadow: `0 0 0 2px ${lin.accent}` }} />
+        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+        {sub ? (
+          <img src={sub.image} alt={sub.name} className="w-7 h-7 rounded-full object-cover ring-2"
+               style={{ boxShadow: `0 0 0 2px ${sub.accent}` }} />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-muted" />
+        )}
+        <div className="text-xs min-w-0 flex-1">
+          <div className="font-medium">
+            Lin → {sub?.name ?? input.employee ?? "teammate"}
+          </div>
+          <div className="text-muted-foreground truncate">{sub?.role ?? "Delegated task"}</div>
+        </div>
+        {running ? (
+          <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <Loader2 className="w-3 h-3 animate-spin" /> Working…
+          </span>
+        ) : output.error ? (
+          <span className="text-[11px] text-destructive flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3" /> Failed
+          </span>
+        ) : (
+          <span className="text-[11px] text-emerald-600 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3 h-3" /> Delivered
+          </span>
+        )}
+      </div>
+
+      {input.task && (
+        <div className="px-4 py-2 text-xs border-b">
+          <span className="text-muted-foreground">Brief: </span>
+          <span>{input.task}</span>
+        </div>
+      )}
+
+      {(timeline.length > 0 || running) && (
+        <ol className="px-4 py-3 space-y-2">
+          {timeline.map((ev, i) => (
+            <TimelineRow key={i} ev={ev} />
+          ))}
+          {running && (
+            <li className="text-[11px] text-muted-foreground flex items-center gap-2">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {sub?.name ?? "Teammate"} is working…
+            </li>
+          )}
+        </ol>
+      )}
+
+      {output.result && (
+        <div className="px-4 py-3 border-t bg-background/40">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            {sub?.name ?? "Result"}
+          </div>
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown>{String(output.result)}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+      {output.error && (
+        <div className="px-4 py-2 text-xs text-destructive border-t">{String(output.error)}</div>
+      )}
+    </div>
+  );
+}
+
+function TimelineRow({ ev }: { ev: any }) {
+  if (ev.kind === "route") {
+    return (
+      <li className="text-[11px] flex items-center gap-2 text-muted-foreground">
+        <ArrowRight className="w-3 h-3" />
+        Routed to <span className="font-medium text-foreground">{ev.employee}</span>
+        {ev.tools?.length ? (
+          <span>· tools: <span className="font-mono">{ev.tools.join(", ")}</span></span>
+        ) : (
+          <span>· no integrations</span>
+        )}
+      </li>
+    );
+  }
+  if (ev.kind === "tool_call") {
+    return (
+      <li className="text-[11px] flex items-center gap-2">
+        <Wrench className="w-3 h-3 text-muted-foreground" />
+        <span className="font-mono">{ev.tool}</span>
+        <span className="text-muted-foreground">called</span>
+      </li>
+    );
+  }
+  if (ev.kind === "tool_result") {
+    const ok = !ev.output?.error;
+    return (
+      <li className="text-[11px] flex items-center gap-2">
+        {ok ? (
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+        ) : (
+          <AlertCircle className="w-3 h-3 text-destructive" />
+        )}
+        <span className="font-mono">{ev.tool}</span>
+        <span className="text-muted-foreground">{ok ? "succeeded" : "failed"}</span>
+      </li>
+    );
+  }
+  if (ev.kind === "thought") {
+    return (
+      <li className="text-[11px] flex items-start gap-2 text-muted-foreground">
+        <Brain className="w-3 h-3 mt-0.5 shrink-0" />
+        <span className="line-clamp-2">{ev.text}</span>
+      </li>
+    );
+  }
+  if (ev.kind === "error") {
+    return (
+      <li className="text-[11px] flex items-center gap-2 text-destructive">
+        <AlertCircle className="w-3 h-3" /> {ev.error}
+      </li>
+    );
+  }
+  if (ev.kind === "done") {
+    return (
+      <li className="text-[11px] flex items-center gap-2 text-emerald-600">
+        <CheckCircle2 className="w-3 h-3" /> Finished
+      </li>
+    );
+  }
+  return null;
 }

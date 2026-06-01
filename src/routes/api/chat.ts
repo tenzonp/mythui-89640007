@@ -7,6 +7,7 @@ import {
   tool,
   type UIMessage,
 } from "ai";
+import { z } from "zod";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -14,7 +15,7 @@ import {
   executeTool,
   type ComposioTool,
 } from "@/lib/composio.server";
-import { agents, getAgent } from "@/data/agents";
+import { agents, getAgent, type Agent } from "@/data/agents";
 
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
   const out: Record<string, any> = {};
@@ -38,6 +39,52 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
     });
   }
   return out;
+}
+
+function buildAgentSystem(agent: Agent, allowedSlugs: string[], roster: string) {
+  const missingForRole = agent.toolkits.filter(
+    (t) => !allowedSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
+  );
+  const scopeNote = agent.canDelegate
+    ? `As CEO you can answer strategy yourself OR delegate hands-on work to a teammate using the delegate_to_employee tool. Use it whenever the task requires a specialist's tools (instagram → Vale, sales CRMs → Bloom, support tickets → Sage, automations → Kade, product/roadmap → Reyes). After delegation, summarize the result for the user.`
+    : `You are scoped to ${agent.role}. Only use the tools you've been given. If asked for work outside your scope, say so briefly and name the right teammate.`;
+  const missingNote = missingForRole.length
+    ? `Integrations your role normally uses but are NOT connected yet: ${missingForRole.join(", ")}. Ask the user to connect them on the Integrations page if needed.`
+    : "";
+  return `You are ${agent.name}, ${agent.role} on the Mythmind AI team.
+Tagline: ${agent.tagline}
+Responsibilities:
+${agent.responsibilities.map((r) => `- ${r}`).join("\n")}
+KPIs:
+${agent.kpis.map((k) => `- ${k.label}: ${k.target}`).join("\n")}
+
+Team roster:
+${roster}
+
+Connected integrations available to you right now: ${allowedSlugs.join(", ") || "none"}.
+${scopeNote}
+${missingNote}
+
+Be concise, warm, proactive. Speak in first person as ${agent.name}.`;
+}
+
+async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[]) {
+  const allowedSlugs = agent.toolkits.length
+    ? activeSlugs.filter((s) =>
+        agent.toolkits.some((t) => t.toLowerCase() === s.toLowerCase()),
+      )
+    : activeSlugs;
+  if (!allowedSlugs.length) return { tools: {}, allowedSlugs };
+  try {
+    const toolsRes = await listToolsForToolkits(userId, allowedSlugs, 25);
+    return {
+      tools: composioToolsToAiSdkTools(toolsRes.items ?? [], userId),
+      allowedSlugs,
+    };
+  } catch (e) {
+    console.error("Composio tools fetch failed", e);
+    return { tools: {}, allowedSlugs };
+  }
 }
 
 export const Route = createFileRoute("/api/chat")({
@@ -67,10 +114,11 @@ export const Route = createFileRoute("/api/chat")({
         const lovableKey = process.env.LOVABLE_API_KEY;
         if (!lovableKey) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
 
-        // Resolve active employee (default Lin/CEO)
-        const agent = getAgent(body.agentId ?? "lin") ?? getAgent("lin")!;
+        // ALL prompts flow through Lin (CEO) by default. If the user explicitly
+        // picked another employee, honor it (direct DM mode).
+        const requestedId = body.agentId ?? "lin";
+        const agent = getAgent(requestedId) ?? getAgent("lin")!;
 
-        // Load user's active Composio connections
         const { data: conns } = await supabaseAdmin
           .from("composio_connections")
           .select("toolkit_slug, status")
@@ -78,65 +126,120 @@ export const Route = createFileRoute("/api/chat")({
         const activeSlugs =
           conns?.filter((c) => c.status === "ACTIVE").map((c) => c.toolkit_slug) ?? [];
 
-        // Filter to toolkits this employee is allowed to use.
-        // Empty toolkits[] (CEO) = access to all active connections.
-        const allowedSlugs = agent.toolkits.length
-          ? activeSlugs.filter((s) =>
-              agent.toolkits.some(
-                (t) => t.toLowerCase() === s.toLowerCase(),
-              ),
-            )
-          : activeSlugs;
-
-        // Toolkits this employee is built for but the user hasn't connected.
-        const missingForRole = agent.toolkits.filter(
-          (t) => !activeSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
-        );
-
-        let aiTools: Record<string, any> = {};
-        if (allowedSlugs.length) {
-          try {
-            const toolsRes = await listToolsForToolkits(userId, allowedSlugs, 25);
-            aiTools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId);
-          } catch (e) {
-            console.error("Composio tools fetch failed", e);
-          }
-        }
-
-        // Team roster for delegation hints
         const roster = agents
           .map(
             (a) =>
-              `- ${a.name} (${a.role}): handles ${a.responsibilities[0].toLowerCase()}; tools: ${
+              `- ${a.id} → ${a.name} (${a.role}): ${a.responsibilities[0].toLowerCase()}; tools: ${
                 a.toolkits.length ? a.toolkits.join(", ") : "all"
               }`,
           )
           .join("\n");
 
-        const delegationNote = agent.canDelegate
-          ? `As CEO you can answer strategy yourself, but when work requires a specialist tool, recommend the right employee by name (Reyes/Vale/Bloom/Kade/Sage) and tell the user to open a chat with them. You may still call any connected tool directly if the user asks.`
-          : `You are scoped to ${agent.role}. You may ONLY use tools from: ${agent.toolkits.join(", ") || "(none)"}. If the user asks for work outside your scope (e.g. ${agent.id === "vale" ? "closing a sales deal" : agent.id === "bloom" ? "running a marketing campaign" : "another team's job"}), do NOT attempt it — name the right teammate from the roster and ask the user to switch to that employee (or to Lin, the CEO, to coordinate).`;
+        const { tools: ownTools, allowedSlugs } = await loadAgentTools(userId, agent, activeSlugs);
+        const aiTools: Record<string, any> = { ...ownTools };
 
-        const missingNote = missingForRole.length
-          ? `Your role normally uses these integrations that are NOT yet connected: ${missingForRole.join(", ")}. If the user asks for those, tell them to connect that integration on the Integrations page.`
-          : "";
+        // Give the CEO a delegate_to_employee tool that actually runs the
+        // specialist in the background and returns a timeline + final result.
+        if (agent.canDelegate) {
+          const gateway = createLovableAiGatewayProvider(lovableKey);
+          const subModel = gateway("google/gemini-2.5-flash");
 
-        const system = `You are ${agent.name}, the ${agent.role} on the Mythmind AI team.
-Tagline: ${agent.tagline}
-Responsibilities:
-${agent.responsibilities.map((r) => `- ${r}`).join("\n")}
-KPIs you are measured on:
-${agent.kpis.map((k) => `- ${k.label}: ${k.target}`).join("\n")}
+          aiTools["delegate_to_employee"] = tool({
+            description:
+              "Hand a concrete task to a specialist teammate. They will execute it using their integrations and return a timeline + final result. Use for any hands-on work outside strategy. employee must be one of: reyes, vale, bloom, kade, sage.",
+            inputSchema: jsonSchema({
+              type: "object",
+              required: ["employee", "task"],
+              properties: {
+                employee: {
+                  type: "string",
+                  enum: ["reyes", "vale", "bloom", "kade", "sage"],
+                  description: "Which teammate should do this.",
+                },
+                task: {
+                  type: "string",
+                  description:
+                    "The full, self-contained task brief for the teammate (what to do, why, any constraints).",
+                },
+              },
+            }),
+            execute: async (args: any) => {
+              const parsed = z
+                .object({ employee: z.string(), task: z.string().min(1) })
+                .safeParse(args);
+              if (!parsed.success) return { error: "Invalid arguments" };
+              const sub = getAgent(parsed.data.employee);
+              if (!sub) return { error: `Unknown employee ${parsed.data.employee}` };
 
-Team roster (use for delegation):
-${roster}
+              const subLoaded = await loadAgentTools(userId, sub, activeSlugs);
+              const subSystem = buildAgentSystem(sub, subLoaded.allowedSlugs, roster);
 
-Connected integrations available to you right now: ${allowedSlugs.join(", ") || "none"}.
-${delegationNote}
-${missingNote}
+              const timeline: any[] = [
+                {
+                  kind: "route",
+                  from: "lin",
+                  to: sub.id,
+                  employee: sub.name,
+                  role: sub.role,
+                  tools: subLoaded.allowedSlugs,
+                  at: Date.now(),
+                },
+              ];
 
-When the user asks for a real action that maps to one of your tools, call the tool. Be concise, warm, and proactive. Always speak in first person as ${agent.name}.`;
+              try {
+                const result = streamText({
+                  model: subModel,
+                  system: subSystem,
+                  tools: subLoaded.tools,
+                  stopWhen: stepCountIs(20),
+                  messages: [{ role: "user", content: parsed.data.task }],
+                  onStepFinish: (step) => {
+                    for (const tc of step.toolCalls ?? []) {
+                      timeline.push({
+                        kind: "tool_call",
+                        tool: tc.toolName,
+                        input: tc.input,
+                        at: Date.now(),
+                      });
+                    }
+                    for (const tr of step.toolResults ?? []) {
+                      timeline.push({
+                        kind: "tool_result",
+                        tool: tr.toolName,
+                        output: tr.output,
+                        at: Date.now(),
+                      });
+                    }
+                    if (step.text) {
+                      timeline.push({ kind: "thought", text: step.text, at: Date.now() });
+                    }
+                  },
+                });
+                const finalText = await result.text;
+                timeline.push({ kind: "done", at: Date.now() });
+                return {
+                  employee: sub.name,
+                  employee_id: sub.id,
+                  role: sub.role,
+                  result: finalText,
+                  timeline,
+                };
+              } catch (e: any) {
+                timeline.push({ kind: "error", error: String(e?.message ?? e), at: Date.now() });
+                return {
+                  employee: sub.name,
+                  employee_id: sub.id,
+                  role: sub.role,
+                  result: "",
+                  timeline,
+                  error: String(e?.message ?? e),
+                };
+              }
+            },
+          });
+        }
 
+        const system = buildAgentSystem(agent, allowedSlugs, roster);
         const gateway = createLovableAiGatewayProvider(lovableKey);
         const model = gateway("google/gemini-2.5-pro");
 
