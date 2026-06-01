@@ -14,14 +14,12 @@ import {
   executeTool,
   type ComposioTool,
 } from "@/lib/composio.server";
+import { agents, getAgent } from "@/data/agents";
 
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
     const safeName = t.slug.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
-    // Composio returns a JSON Schema in input_parameters. Without a real schema
-    // the model can't pass arguments, so tools end up called with empty input
-    // and fail (e.g. Gmail "missing required field"). Forward the schema.
     const raw =
       t.input_parameters && typeof t.input_parameters === "object"
         ? (t.input_parameters as any)
@@ -60,6 +58,7 @@ export const Route = createFileRoute("/api/chat")({
         const body = (await request.json()) as {
           messages: UIMessage[];
           threadId?: string;
+          agentId?: string;
         };
         if (!Array.isArray(body.messages)) {
           return new Response("messages required", { status: 400 });
@@ -68,7 +67,10 @@ export const Route = createFileRoute("/api/chat")({
         const lovableKey = process.env.LOVABLE_API_KEY;
         if (!lovableKey) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
 
-        // Load user's active Composio connections + tools (capped)
+        // Resolve active employee (default Lin/CEO)
+        const agent = getAgent(body.agentId ?? "lin") ?? getAgent("lin")!;
+
+        // Load user's active Composio connections
         const { data: conns } = await supabaseAdmin
           .from("composio_connections")
           .select("toolkit_slug, status")
@@ -76,23 +78,67 @@ export const Route = createFileRoute("/api/chat")({
         const activeSlugs =
           conns?.filter((c) => c.status === "ACTIVE").map((c) => c.toolkit_slug) ?? [];
 
+        // Filter to toolkits this employee is allowed to use.
+        // Empty toolkits[] (CEO) = access to all active connections.
+        const allowedSlugs = agent.toolkits.length
+          ? activeSlugs.filter((s) =>
+              agent.toolkits.some(
+                (t) => t.toLowerCase() === s.toLowerCase(),
+              ),
+            )
+          : activeSlugs;
+
+        // Toolkits this employee is built for but the user hasn't connected.
+        const missingForRole = agent.toolkits.filter(
+          (t) => !activeSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
+        );
+
         let aiTools: Record<string, any> = {};
-        if (activeSlugs.length) {
+        if (allowedSlugs.length) {
           try {
-            const toolsRes = await listToolsForToolkits(userId, activeSlugs, 25);
+            const toolsRes = await listToolsForToolkits(userId, allowedSlugs, 25);
             aiTools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId);
           } catch (e) {
             console.error("Composio tools fetch failed", e);
           }
         }
 
+        // Team roster for delegation hints
+        const roster = agents
+          .map(
+            (a) =>
+              `- ${a.name} (${a.role}): handles ${a.responsibilities[0].toLowerCase()}; tools: ${
+                a.toolkits.length ? a.toolkits.join(", ") : "all"
+              }`,
+          )
+          .join("\n");
+
+        const delegationNote = agent.canDelegate
+          ? `As CEO you can answer strategy yourself, but when work requires a specialist tool, recommend the right employee by name (Reyes/Vale/Bloom/Kade/Sage) and tell the user to open a chat with them. You may still call any connected tool directly if the user asks.`
+          : `You are scoped to ${agent.role}. You may ONLY use tools from: ${agent.toolkits.join(", ") || "(none)"}. If the user asks for work outside your scope (e.g. ${agent.id === "vale" ? "closing a sales deal" : agent.id === "bloom" ? "running a marketing campaign" : "another team's job"}), do NOT attempt it — name the right teammate from the roster and ask the user to switch to that employee (or to Lin, the CEO, to coordinate).`;
+
+        const missingNote = missingForRole.length
+          ? `Your role normally uses these integrations that are NOT yet connected: ${missingForRole.join(", ")}. If the user asks for those, tell them to connect that integration on the Integrations page.`
+          : "";
+
+        const system = `You are ${agent.name}, the ${agent.role} on the Mythmind AI team.
+Tagline: ${agent.tagline}
+Responsibilities:
+${agent.responsibilities.map((r) => `- ${r}`).join("\n")}
+KPIs you are measured on:
+${agent.kpis.map((k) => `- ${k.label}: ${k.target}`).join("\n")}
+
+Team roster (use for delegation):
+${roster}
+
+Connected integrations available to you right now: ${allowedSlugs.join(", ") || "none"}.
+${delegationNote}
+${missingNote}
+
+When the user asks for a real action that maps to one of your tools, call the tool. Be concise, warm, and proactive. Always speak in first person as ${agent.name}.`;
+
         const gateway = createLovableAiGatewayProvider(lovableKey);
         const model = gateway("google/gemini-2.5-pro");
-
-        const system = `You are Mythmind — a team of specialist AI employees that delivers real work, not just answers.
-You have access to ${activeSlugs.length} connected integrations (${activeSlugs.join(", ") || "none yet"}) via Composio tools.
-When the user asks for an action (send an email, create an issue, search docs, etc.), call the relevant tool. If no tool is connected for the request, tell the user to connect that integration in the Integrations page.
-Be concise, friendly, and proactive.`;
 
         const result = streamText({
           model,
@@ -102,14 +148,12 @@ Be concise, friendly, and proactive.`;
           messages: await convertToModelMessages(body.messages),
         });
 
-        // Persist on finish
         const threadId = body.threadId;
         return result.toUIMessageStreamResponse({
           originalMessages: body.messages,
           onFinish: async ({ messages }) => {
             if (!threadId) return;
             try {
-              // Save only the newly-added messages (last user msg + assistant)
               const lastUser = body.messages[body.messages.length - 1];
               const newAssistant = messages[messages.length - 1];
               const rows: any[] = [];
@@ -133,7 +177,6 @@ Be concise, friendly, and proactive.`;
                 const { error } = await supabaseAdmin.from("messages").insert(rows);
                 if (error) console.error("Message insert failed", error);
               }
-              // Bump thread updated_at + auto-title from first user msg
               const updates: any = { updated_at: new Date().toISOString() };
               const { data: existing } = await supabaseAdmin
                 .from("threads")
