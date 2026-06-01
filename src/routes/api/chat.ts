@@ -172,7 +172,45 @@ export const Route = createFileRoute("/api/chat")({
               if (!sub) return { error: `Unknown employee ${parsed.data.employee}` };
 
               const subLoaded = await loadAgentTools(userId, sub, activeSlugs);
-              const subSystem = buildAgentSystem(sub, subLoaded.allowedSlugs, roster);
+              const missingTools = sub.toolkits.filter(
+                (t) => !activeSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
+              );
+              const hasNoTools = subLoaded.allowedSlugs.length === 0;
+
+              // If the specialist has zero connected integrations, do NOT
+              // pretend the work was done. Return a structured "blocked" result
+              // so the CEO surfaces it honestly to the user.
+              if (hasNoTools) {
+                return {
+                  employee: sub.name,
+                  employee_id: sub.id,
+                  role: sub.role,
+                  status: "blocked",
+                  blocker: "no_integrations_connected",
+                  missing_integrations: sub.toolkits,
+                  result: "",
+                  timeline: [
+                    {
+                      kind: "route",
+                      from: "lin",
+                      to: sub.id,
+                      employee: sub.name,
+                      role: sub.role,
+                      tools: [],
+                      at: Date.now(),
+                    },
+                    {
+                      kind: "blocked",
+                      reason: `${sub.name} has no connected integrations for this task. Needs one of: ${sub.toolkits.join(", ")}.`,
+                      at: Date.now(),
+                    },
+                  ],
+                };
+              }
+
+              const subSystem =
+                buildAgentSystem(sub, subLoaded.allowedSlugs, roster) +
+                `\n\nIMPORTANT: You MUST actually use your tools to complete the task. Do NOT just describe what you would do — call the relevant tool(s) and act on the result. If the available tools genuinely cannot accomplish the task, say so explicitly and name what integration is missing.`;
 
               const timeline: any[] = [
                 {
@@ -182,9 +220,11 @@ export const Route = createFileRoute("/api/chat")({
                   employee: sub.name,
                   role: sub.role,
                   tools: subLoaded.allowedSlugs,
+                  missing: missingTools,
                   at: Date.now(),
                 },
               ];
+
 
               try {
                 const result = streamText({
