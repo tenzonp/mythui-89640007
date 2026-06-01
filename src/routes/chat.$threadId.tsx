@@ -1,7 +1,7 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getThreadMessages, listMyConnections, deleteMessage } from "@/lib/chat.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown, Copy, Share2, Tr
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { agents, getAgent } from "@/data/agents";
 
 export const Route = createFileRoute("/chat/$threadId")({
   component: ChatThread,
@@ -55,20 +56,38 @@ function ChatWindow({
   conns: any[];
 }) {
   const activeCount = conns.filter((c) => c.status === "ACTIVE").length;
-
-  const transport = new DefaultChatTransport({
-    api: "/api/chat",
-    fetch: async (input, init) => {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const headers = new Headers(init?.headers);
-      if (token) headers.set("Authorization", `Bearer ${token}`);
-      return fetch(input, { ...init, headers });
-    },
-    prepareSendMessagesRequest: ({ messages, id }) => ({
-      body: { messages, threadId: id },
-    }),
+  const storageKey = `mythmind:agent:${threadId}`;
+  const [agentId, setAgentId] = useState<string>(() => {
+    if (typeof window === "undefined") return "lin";
+    return window.localStorage.getItem(storageKey) ?? "lin";
   });
+  const agent = getAgent(agentId) ?? agents[0];
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem(storageKey, agentId);
+  }, [agentId, storageKey]);
+
+  const agentRef = useRef(agentId);
+  useEffect(() => {
+    agentRef.current = agentId;
+  }, [agentId]);
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        fetch: async (input, init) => {
+          const { data } = await supabase.auth.getSession();
+          const token = data.session?.access_token;
+          const headers = new Headers(init?.headers);
+          if (token) headers.set("Authorization", `Bearer ${token}`);
+          return fetch(input, { ...init, headers });
+        },
+        prepareSendMessagesRequest: ({ messages, id }) => ({
+          body: { messages, threadId: id, agentId: agentRef.current },
+        }),
+      }),
+    [],
+  );
 
   const { messages, sendMessage, status, error, setMessages } = useChat({
     id: threadId,
@@ -98,19 +117,61 @@ function ChatWindow({
 
   const busy = status === "submitted" || status === "streaming";
 
+  const allowedSlugs = agent.toolkits.length
+    ? conns
+        .filter((c) => c.status === "ACTIVE")
+        .filter((c) =>
+          agent.toolkits.some((t) => t.toLowerCase() === String(c.toolkit_slug).toLowerCase()),
+        )
+    : conns.filter((c) => c.status === "ACTIVE");
+
   return (
     <>
-      <div className="border-b px-6 py-3 flex items-center justify-between bg-background/80 backdrop-blur">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="w-4 h-4" /> Mythmind · Gemini 2.5 Pro
+      <div className="border-b px-6 py-3 flex items-center justify-between bg-background/80 backdrop-blur gap-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src={agent.image}
+            alt={agent.name}
+            className="w-8 h-8 rounded-full object-cover ring-2"
+            style={{ boxShadow: `0 0 0 2px ${agent.accent}` }}
+          />
+          <div className="min-w-0">
+            <div className="text-sm font-medium leading-tight">{agent.name}</div>
+            <div className="text-[11px] text-muted-foreground truncate">{agent.role}</div>
+          </div>
+          <select
+            value={agentId}
+            onChange={(e) => setAgentId(e.target.value)}
+            className="ml-2 text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
+            aria-label="Choose employee"
+          >
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} — {a.role}
+              </option>
+            ))}
+          </select>
         </div>
-        <Link
-          to="/integrations"
-          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border hover:bg-accent"
-        >
-          <Plug className="w-3 h-3" />
-          {activeCount} integration{activeCount === 1 ? "" : "s"}
-        </Link>
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[11px] px-2 py-1 rounded-full border text-muted-foreground"
+            title={
+              agent.toolkits.length
+                ? `Allowed: ${agent.toolkits.join(", ")}`
+                : "CEO has access to all your integrations"
+            }
+          >
+            <Wrench className="inline w-3 h-3 mr-1" />
+            {allowedSlugs.length}/{agent.toolkits.length || activeCount} tools
+          </span>
+          <Link
+            to="/integrations"
+            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border hover:bg-accent"
+          >
+            <Plug className="w-3 h-3" />
+            {activeCount} connected
+          </Link>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
