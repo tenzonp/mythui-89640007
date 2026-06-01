@@ -46,8 +46,9 @@ function buildAgentSystem(agent: Agent, allowedSlugs: string[], roster: string) 
     (t) => !allowedSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
   );
   const scopeNote = agent.canDelegate
-    ? `As CEO you can answer strategy yourself OR delegate hands-on work to a teammate using the delegate_to_employee tool. Use it whenever the task requires a specialist's tools (instagram → Vale, sales CRMs → Bloom, support tickets → Sage, automations → Kade, product/roadmap → Reyes). After delegation, summarize the result for the user.`
+    ? `As CEO you can answer strategy yourself OR delegate hands-on work to a teammate using the delegate_to_employee tool. Use it whenever the task requires a specialist's tools (instagram → Vale, sales CRMs → Bloom, support tickets → Sage, automations → Kade, product/roadmap → Reyes).\n\nCRITICAL HONESTY RULES after delegating:\n- If the result has status="blocked" or an error, DO NOT say the task was done. Tell the user plainly that the teammate could not complete it, name the missing integration(s), and point them to the Integrations page to connect them.\n- Only say work is "done" / "shipped" / "created" when the timeline shows successful tool_result entries proving the action happened.\n- Always summarize what actually happened using the timeline + result fields — never invent outcomes.`
     : `You are scoped to ${agent.role}. Only use the tools you've been given. If asked for work outside your scope, say so briefly and name the right teammate.`;
+
   const missingNote = missingForRole.length
     ? `Integrations your role normally uses but are NOT connected yet: ${missingForRole.join(", ")}. Ask the user to connect them on the Integrations page if needed.`
     : "";
@@ -172,7 +173,45 @@ export const Route = createFileRoute("/api/chat")({
               if (!sub) return { error: `Unknown employee ${parsed.data.employee}` };
 
               const subLoaded = await loadAgentTools(userId, sub, activeSlugs);
-              const subSystem = buildAgentSystem(sub, subLoaded.allowedSlugs, roster);
+              const missingTools = sub.toolkits.filter(
+                (t) => !activeSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
+              );
+              const hasNoTools = subLoaded.allowedSlugs.length === 0;
+
+              // If the specialist has zero connected integrations, do NOT
+              // pretend the work was done. Return a structured "blocked" result
+              // so the CEO surfaces it honestly to the user.
+              if (hasNoTools) {
+                return {
+                  employee: sub.name,
+                  employee_id: sub.id,
+                  role: sub.role,
+                  status: "blocked",
+                  blocker: "no_integrations_connected",
+                  missing_integrations: sub.toolkits,
+                  result: "",
+                  timeline: [
+                    {
+                      kind: "route",
+                      from: "lin",
+                      to: sub.id,
+                      employee: sub.name,
+                      role: sub.role,
+                      tools: [],
+                      at: Date.now(),
+                    },
+                    {
+                      kind: "blocked",
+                      reason: `${sub.name} has no connected integrations for this task. Needs one of: ${sub.toolkits.join(", ")}.`,
+                      at: Date.now(),
+                    },
+                  ],
+                };
+              }
+
+              const subSystem =
+                buildAgentSystem(sub, subLoaded.allowedSlugs, roster) +
+                `\n\nIMPORTANT: You MUST actually use your tools to complete the task. Do NOT just describe what you would do — call the relevant tool(s) and act on the result. If the available tools genuinely cannot accomplish the task, say so explicitly and name what integration is missing.`;
 
               const timeline: any[] = [
                 {
@@ -182,9 +221,11 @@ export const Route = createFileRoute("/api/chat")({
                   employee: sub.name,
                   role: sub.role,
                   tools: subLoaded.allowedSlugs,
+                  missing: missingTools,
                   at: Date.now(),
                 },
               ];
+
 
               try {
                 const result = streamText({
