@@ -184,7 +184,7 @@ function Dashboard() {
                       key={a.id}
                       to="/ai-employees/$agentId"
                       params={{ agentId: a.id }}
-                      className="group rounded-xl border bg-card p-5 hover:shadow-lg transition-shadow"
+                      className="group rounded-xl border bg-card p-5 hover:shadow-lg transition-shadow flex flex-col"
                     >
                       <div className="flex items-center gap-4">
                         <img
@@ -198,15 +198,49 @@ function Dashboard() {
                           <div className="text-xs text-muted-foreground">{a.role}</div>
                         </div>
                       </div>
-                      <p className="mt-4 text-sm text-muted-foreground line-clamp-2">{a.description}</p>
+
+                      <div className="mt-4">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                          Responsibilities
+                        </div>
+                        <ul className="space-y-1">
+                          {a.responsibilities.slice(0, 3).map((r) => (
+                            <li key={r} className="text-xs text-muted-foreground flex gap-1.5">
+                              <span style={{ color: a.accent }}>•</span>
+                              <span className="line-clamp-1">{r}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                          KPIs
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {a.kpis.map((k) => (
+                            <span
+                              key={k.label}
+                              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border"
+                              style={{ borderColor: a.accent, color: a.accent }}
+                              title={k.label}
+                            >
+                              <span className="opacity-70">{k.label}:</span>
+                              <span className="font-medium">{k.target}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="mt-4 flex items-center gap-2 text-xs">
                         <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-600">
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Online
                         </span>
-                        <span className="text-muted-foreground">
-                          <Activity className="inline w-3 h-3 mr-1" />
-                          Active now
-                        </span>
+                        {a.canDelegate && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary">
+                            Can delegate
+                          </span>
+                        )}
                       </div>
                     </Link>
                   ))}
