@@ -145,11 +145,14 @@ function ChatWindow({
             className="ml-2 text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
             aria-label="Choose employee"
           >
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} — {a.role}
-              </option>
-            ))}
+            <option value="lin">Lin — CEO (auto-routes the team)</option>
+            {agents
+              .filter((a) => a.id !== "lin")
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} — {a.role} (direct)
+                </option>
+              ))}
           </select>
         </div>
         <div className="flex items-center gap-2">
