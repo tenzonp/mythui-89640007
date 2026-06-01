@@ -391,6 +391,10 @@ function ToolCall({ part }: { part: any }) {
   if (name === "delegate_to_employee") {
     return <DelegationCard part={part} />;
   }
+  return <GenericToolCall part={part} name={name} />;
+}
+
+function GenericToolCall({ part, name }: { part: any; name: string }) {
   const [open, setOpen] = useState(false);
   const state = part.state ?? "input-streaming";
   const statusLabel =
