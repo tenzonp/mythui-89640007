@@ -420,8 +420,7 @@ export const Route = createFileRoute("/api/chat")({
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
         if (agent.canDelegate) {
-          const gateway = createLovableAiGatewayProvider(lovableKey);
-          const subModel = gateway("google/gemini-2.5-flash");
+          const subModel = deepseek(DEEPSEEK_SUB_MODEL);
 
           aiTools["delegate_to_employee"] = tool({
             description:
