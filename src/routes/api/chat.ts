@@ -48,6 +48,7 @@ async function queueInstagramPendingReply(args: {
   userId: string;
   recipientId: string;
   messageText: string;
+  toolSlug: string;
   raw: any;
   toolArgs: any;
 }) {
@@ -57,6 +58,7 @@ async function queueInstagramPendingReply(args: {
       user_id: args.userId,
       recipient_id: args.recipientId,
       message_text: args.messageText,
+      tool_slug: args.toolSlug,
       status: "pending",
       error_subcode: 2534022,
       last_error: "Instagram 24-hour messaging window is closed for this recipient.",
@@ -73,6 +75,91 @@ function buildInstagramWindowResponse(userId: string, args: any, raw: any) {
   const recipientId = extractInstagramRecipient(args);
   const messageText = extractInstagramMessage(args);
   return { recipientId, messageText, raw, userId };
+}
+
+function hasInstagram(activeSlugs: string[]) {
+  return activeSlugs.some((s) => s.toLowerCase() === "instagram");
+}
+
+function createPendingInstagramReplyTool(userId: string) {
+  return tool({
+    description:
+      "Send pending Instagram replies for a recipient after they have messaged first and reopened Meta's 24-hour window. Use only when the user says the recipient replied or asks to send queued/pending Instagram replies.",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["recipient_id"],
+      properties: {
+        recipient_id: {
+          type: "string",
+          description: "Instagram recipient/user ID whose pending replies should be sent.",
+        },
+        limit: { type: "number", description: "Maximum pending replies to send. Default 5." },
+      },
+    }),
+    execute: async (args: any) => {
+      const recipientId = String(args?.recipient_id ?? "").trim();
+      if (!recipientId) return { error: "recipient_id is required" };
+      const limit = Math.max(1, Math.min(Number(args?.limit ?? 5) || 5, 10));
+      const { data: rows, error } = await (supabaseAdmin as any)
+        .from("instagram_pending_replies")
+        .select("id, recipient_id, message_text, tool_slug, raw_error, created_at")
+        .eq("user_id", userId)
+        .eq("recipient_id", recipientId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      if (error) return { error: error.message };
+      if (!rows?.length) return { status: "empty", recipient_id: recipientId, message: "No pending Instagram replies for this recipient." };
+
+      const results: any[] = [];
+      for (const row of rows) {
+        const rawArgs = row.raw_error?.arguments ?? {};
+        const toolArgs = { ...rawArgs };
+        const messageKey = extractByKeys(toolArgs, ["message", "message_text", "messagetext", "text", "content", "body", "reply"])
+          ? null
+          : "message";
+        if (messageKey) toolArgs[messageKey] = row.message_text;
+        try {
+          const res = await executeTool(row.tool_slug, userId, toolArgs);
+          if (detectInstagramWindowClosed(res)) {
+            await (supabaseAdmin as any)
+              .from("instagram_pending_replies")
+              .update({ last_error: "Instagram 24-hour window is still closed.", raw_error: { raw: res, arguments: toolArgs } })
+              .eq("id", row.id)
+              .eq("user_id", userId);
+            results.push({ id: row.id, status: "still_blocked", error_subcode: 2534022, raw: res });
+            break;
+          }
+          await (supabaseAdmin as any)
+            .from("instagram_pending_replies")
+            .update({ status: "sent", sent_at: new Date().toISOString(), reopened_at: new Date().toISOString(), raw_error: { raw: res, arguments: toolArgs } })
+            .eq("id", row.id)
+            .eq("user_id", userId);
+          results.push({ id: row.id, status: "sent", raw: res });
+        } catch (e: any) {
+          const msg = String(e?.message ?? e);
+          await (supabaseAdmin as any)
+            .from("instagram_pending_replies")
+            .update({ last_error: msg, raw_error: { error: msg, arguments: toolArgs } })
+            .eq("id", row.id)
+            .eq("user_id", userId);
+          if (msg.includes("2534022") || /24.?hour/i.test(msg)) {
+            results.push({ id: row.id, status: "still_blocked", error_subcode: 2534022, error: msg });
+            break;
+          }
+          results.push({ id: row.id, status: "failed", error: msg });
+        }
+      }
+      return {
+        status: results.some((r) => r.status === "sent") ? "sent" : "blocked",
+        recipient_id: recipientId,
+        results,
+        message: results.some((r) => r.status === "still_blocked")
+          ? "The queued reply is still blocked by Instagram's 24-hour rule. Wait until this recipient sends a new message, then run pending replies again."
+          : "Pending Instagram replies processed.",
+      };
+    },
+  });
 }
 
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
