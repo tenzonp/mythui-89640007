@@ -447,6 +447,8 @@ function DelegationCard({ part }: { part: any }) {
   const lin = getAgent("lin")!;
   const timeline: any[] = Array.isArray(output.timeline) ? output.timeline : [];
   const running = state !== "output-available" && state !== "output-error";
+  const queued = output.status === "queued" || timeline.some((ev) => ev.output?.status === "queued");
+  const blocked = output.status === "blocked" || timeline.some((ev) => ev.output?.status === "blocked" || ev.output?.status === "still_blocked");
 
   return (
     <div className="border rounded-2xl bg-gradient-to-br from-muted/40 to-background overflow-hidden">
@@ -470,9 +472,13 @@ function DelegationCard({ part }: { part: any }) {
           <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" /> Working…
           </span>
-        ) : output.error ? (
+        ) : queued ? (
+          <span className="text-[11px] text-amber-600 flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3" /> Queued
+          </span>
+        ) : output.error || blocked ? (
           <span className="text-[11px] text-destructive flex items-center gap-1.5">
-            <AlertCircle className="w-3 h-3" /> Failed
+            <AlertCircle className="w-3 h-3" /> Blocked
           </span>
         ) : (
           <span className="text-[11px] text-emerald-600 flex items-center gap-1.5">
@@ -543,16 +549,22 @@ function TimelineRow({ ev }: { ev: any }) {
     );
   }
   if (ev.kind === "tool_result") {
-    const ok = !ev.output?.error;
+    const queued = ev.output?.status === "queued";
+    const blocked = ev.output?.status === "blocked" || ev.output?.status === "still_blocked" || ev.output?.blocker;
+    const ok = !ev.output?.error && !blocked && !queued;
     return (
       <li className="text-[11px] flex items-center gap-2">
-        {ok ? (
+        {queued ? (
+          <AlertCircle className="w-3 h-3 text-amber-600" />
+        ) : ok ? (
           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
         ) : (
           <AlertCircle className="w-3 h-3 text-destructive" />
         )}
         <span className="font-mono">{ev.tool}</span>
-        <span className="text-muted-foreground">{ok ? "succeeded" : "failed"}</span>
+        <span className="text-muted-foreground">
+          {queued ? "queued until recipient replies" : ok ? "succeeded" : "blocked"}
+        </span>
       </li>
     );
   }
