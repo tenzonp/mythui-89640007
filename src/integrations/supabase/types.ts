@@ -60,6 +60,7 @@ export type Database = {
           reopened_at: string | null
           sent_at: string | null
           status: string
+          tool_slug: string | null
           updated_at: string
           user_id: string
         }
@@ -75,6 +76,7 @@ export type Database = {
           reopened_at?: string | null
           sent_at?: string | null
           status?: string
+          tool_slug?: string | null
           updated_at?: string
           user_id: string
         }
@@ -90,6 +92,7 @@ export type Database = {
           reopened_at?: string | null
           sent_at?: string | null
           status?: string
+          tool_slug?: string | null
           updated_at?: string
           user_id?: string
         }
