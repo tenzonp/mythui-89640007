@@ -284,6 +284,23 @@ function EmptyState({ onPick }: { onPick: (t: string) => void }) {
   );
 }
 
+function InstagramPendingBanner({ pending }: { pending: any[] }) {
+  const first = pending[0];
+  return (
+    <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">Instagram reply waiting for 24-hour window</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {pending.length} queued reply{pending.length === 1 ? "" : "ies"}. When recipient {first?.recipient_id} messages you first, ask the team to send pending Instagram replies for that recipient.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
   const text = m.parts.map((p: any) => (p.type === "text" ? p.text : "")).join("");
 
