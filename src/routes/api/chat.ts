@@ -10,11 +10,7 @@ import {
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  listToolsForToolkits,
-  executeTool,
-  type ComposioTool,
-} from "@/lib/composio.server";
+import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
 
 function extractByKeys(value: any, keys: string[]): string | null {
@@ -32,16 +28,34 @@ function extractByKeys(value: any, keys: string[]): string | null {
 }
 
 function extractInstagramRecipient(args: any) {
-  return extractByKeys(args, ["recipient_id", "recipientid", "user_id", "userid", "ig_user_id", "instagram_user_id", "id"]);
+  return extractByKeys(args, [
+    "recipient_id",
+    "recipientid",
+    "user_id",
+    "userid",
+    "ig_user_id",
+    "instagram_user_id",
+    "id",
+  ]);
 }
 
 function extractInstagramMessage(args: any) {
-  return extractByKeys(args, ["message", "message_text", "messagetext", "text", "content", "body", "reply"]);
+  return extractByKeys(args, [
+    "message",
+    "message_text",
+    "messagetext",
+    "text",
+    "content",
+    "body",
+    "reply",
+  ]);
 }
 
 function isInstagramSendTool(t: ComposioTool) {
   const haystack = `${t.slug} ${t.name ?? ""} ${t.description ?? ""}`.toLowerCase();
-  return (t.toolkit?.slug ?? "").toLowerCase() === "instagram" && /send|reply|message|dm/.test(haystack);
+  return (
+    (t.toolkit?.slug ?? "").toLowerCase() === "instagram" && /send|reply|message|dm/.test(haystack)
+  );
 }
 
 async function queueInstagramPendingReply(args: {
@@ -109,26 +123,46 @@ function createPendingInstagramReplyTool(userId: string) {
         .order("created_at", { ascending: true })
         .limit(limit);
       if (error) return { error: error.message };
-      if (!rows?.length) return { status: "empty", recipient_id: recipientId, message: "No pending Instagram replies for this recipient." };
+      if (!rows?.length)
+        return {
+          status: "empty",
+          recipient_id: recipientId,
+          message: "No pending Instagram replies for this recipient.",
+        };
 
       const results: any[] = [];
       for (const row of rows) {
         const rawArgs = row.raw_error?.arguments ?? {};
         const toolArgs = { ...rawArgs };
-        const messageKey = extractByKeys(toolArgs, ["message", "message_text", "messagetext", "text", "content", "body", "reply"])
+        const messageKey = extractByKeys(toolArgs, [
+          "message",
+          "message_text",
+          "messagetext",
+          "text",
+          "content",
+          "body",
+          "reply",
+        ])
           ? null
           : "message";
         if (messageKey) toolArgs[messageKey] = row.message_text;
         try {
           if (!row.tool_slug) {
-            results.push({ id: row.id, status: "failed", error: "Missing original Instagram send tool." });
+            results.push({
+              id: row.id,
+              status: "failed",
+              error: "Missing original Instagram send tool.",
+            });
             continue;
           }
           const res = await executeTool(row.tool_slug, userId, toolArgs);
           if (detectInstagramWindowClosed(res)) {
             await (supabaseAdmin as any)
               .from("instagram_pending_replies")
-              .update({ last_error: "Instagram 24-hour window is still closed.", raw_error: { raw: res, arguments: toolArgs } })
+              .update({
+                last_error: "Instagram 24-hour window is still closed.",
+                raw_error: { raw: res, arguments: toolArgs },
+              })
               .eq("id", row.id)
               .eq("user_id", userId);
             results.push({ id: row.id, status: "still_blocked", error_subcode: 2534022, raw: res });
@@ -136,7 +170,12 @@ function createPendingInstagramReplyTool(userId: string) {
           }
           await (supabaseAdmin as any)
             .from("instagram_pending_replies")
-            .update({ status: "sent", sent_at: new Date().toISOString(), reopened_at: new Date().toISOString(), raw_error: { raw: res, arguments: toolArgs } })
+            .update({
+              status: "sent",
+              sent_at: new Date().toISOString(),
+              reopened_at: new Date().toISOString(),
+              raw_error: { raw: res, arguments: toolArgs },
+            })
             .eq("id", row.id)
             .eq("user_id", userId);
           results.push({ id: row.id, status: "sent", raw: res });
@@ -148,7 +187,12 @@ function createPendingInstagramReplyTool(userId: string) {
             .eq("id", row.id)
             .eq("user_id", userId);
           if (msg.includes("2534022") || /24.?hour/i.test(msg)) {
-            results.push({ id: row.id, status: "still_blocked", error_subcode: 2534022, error: msg });
+            results.push({
+              id: row.id,
+              status: "still_blocked",
+              error_subcode: 2534022,
+              error: msg,
+            });
             break;
           }
           results.push({ id: row.id, status: "failed", error: msg });
@@ -295,9 +339,7 @@ Be concise, warm, proactive. Speak in first person as ${agent.name}.`;
 
 async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[]) {
   const allowedSlugs = agent.toolkits.length
-    ? activeSlugs.filter((s) =>
-        agent.toolkits.some((t) => t.toLowerCase() === s.toLowerCase()),
-      )
+    ? activeSlugs.filter((s) => agent.toolkits.some((t) => t.toLowerCase() === s.toLowerCase()))
     : activeSlugs;
   if (!allowedSlugs.length) return { tools: {}, allowedSlugs };
   try {
@@ -456,7 +498,6 @@ export const Route = createFileRoute("/api/chat")({
                   at: Date.now(),
                 },
               ];
-
 
               try {
                 const result = streamText({

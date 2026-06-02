@@ -51,7 +51,6 @@ export const deleteMessage = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-
 export const getThreadMessages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { threadId: string }) => d)
