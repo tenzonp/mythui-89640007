@@ -400,8 +400,14 @@ function ToolCall({ part }: { part: any }) {
 function GenericToolCall({ part, name }: { part: any; name: string }) {
   const [open, setOpen] = useState(false);
   const state = part.state ?? "input-streaming";
+  const queued = part.output?.status === "queued";
+  const blocked = part.output?.status === "blocked" || part.output?.blocker;
   const statusLabel =
-    state === "output-available"
+    queued
+      ? "Queued"
+      : blocked
+        ? "Blocked"
+        : state === "output-available"
       ? "Done"
       : state === "output-error"
         ? "Error"
@@ -428,9 +434,15 @@ function GenericToolCall({ part, name }: { part: any; name: string }) {
             </pre>
           )}
           {part.output && (
-            <pre className="bg-background rounded p-2 overflow-auto max-h-64">
-              {JSON.stringify(part.output, null, 2)}
-            </pre>
+            part.output?.message ? (
+              <div className="bg-background rounded p-2 text-muted-foreground">
+                {String(part.output.message)}
+              </div>
+            ) : (
+              <pre className="bg-background rounded p-2 overflow-auto max-h-64">
+                {JSON.stringify(part.output, null, 2)}
+              </pre>
+            )
           )}
         </div>
       )}
