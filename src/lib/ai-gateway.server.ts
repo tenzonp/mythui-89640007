@@ -2,6 +2,9 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 const LOVABLE_AIG_RUN_ID_HEADER = "X-Lovable-AIG-Run-ID";
 
+/**
+ * Lovable AI Gateway provider (kept for fallback / image generation).
+ */
 export function createLovableAiGatewayProvider(lovableApiKey: string, initialRunId?: string) {
   let runId = initialRunId?.trim() || undefined;
   let resolveRunId: (value: string | undefined) => void = () => {};
@@ -47,3 +50,22 @@ export function createLovableAiGatewayProvider(lovableApiKey: string, initialRun
     waitForRunId: () => (runId ? Promise.resolve(runId) : runIdReady),
   });
 }
+
+/**
+ * DeepSeek provider (OpenAI-compatible API).
+ * Available models:
+ *  - "deepseek-chat"     → DeepSeek-V3 (general purpose, default)
+ *  - "deepseek-reasoner" → DeepSeek-R1 (extended reasoning)
+ */
+export function createDeepSeekProvider(apiKey: string) {
+  return createOpenAICompatible({
+    name: "deepseek",
+    baseURL: "https://api.deepseek.com/v1",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+}
+
+export const DEEPSEEK_MAIN_MODEL = "deepseek-chat";
+export const DEEPSEEK_SUB_MODEL = "deepseek-chat";

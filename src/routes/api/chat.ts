@@ -8,7 +8,11 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import {
+  createDeepSeekProvider,
+  DEEPSEEK_MAIN_MODEL,
+  DEEPSEEK_SUB_MODEL,
+} from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
@@ -382,8 +386,9 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("messages required", { status: 400 });
         }
 
-        const lovableKey = process.env.LOVABLE_API_KEY;
-        if (!lovableKey) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
+        const deepseekKey = process.env.DEEPSEEK_API_KEY;
+        if (!deepseekKey) return new Response("Missing DEEPSEEK_API_KEY", { status: 500 });
+        const deepseek = createDeepSeekProvider(deepseekKey);
 
         // ALL prompts flow through Lin (CEO) by default. If the user explicitly
         // picked another employee, honor it (direct DM mode).
@@ -415,8 +420,7 @@ export const Route = createFileRoute("/api/chat")({
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
         if (agent.canDelegate) {
-          const gateway = createLovableAiGatewayProvider(lovableKey);
-          const subModel = gateway("google/gemini-2.5-flash");
+          const subModel = deepseek(DEEPSEEK_SUB_MODEL);
 
           aiTools["delegate_to_employee"] = tool({
             description:
@@ -553,8 +557,7 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const system = buildAgentSystem(agent, allowedSlugs, roster);
-        const gateway = createLovableAiGatewayProvider(lovableKey);
-        const model = gateway("google/gemini-2.5-pro");
+        const model = deepseek(DEEPSEEK_MAIN_MODEL);
 
         const result = streamText({
           model,
