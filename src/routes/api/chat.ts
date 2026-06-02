@@ -12,6 +12,7 @@ import {
   createDeepSeekProvider,
   DEEPSEEK_MAIN_MODEL,
   DEEPSEEK_SUB_MODEL,
+  pickDeepSeekModel,
 } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
