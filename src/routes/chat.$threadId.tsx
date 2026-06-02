@@ -3,9 +3,30 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getThreadMessages, listMyConnections, deleteMessage } from "@/lib/chat.functions";
+import {
+  getThreadMessages,
+  listMyConnections,
+  deleteMessage,
+  listInstagramPendingReplies,
+} from "@/lib/chat.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown, Copy, Share2, Trash2, Flag, Check, ArrowRight, Brain, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  ArrowUp,
+  Loader2,
+  Plug,
+  Sparkles,
+  Wrench,
+  ChevronDown,
+  Copy,
+  Share2,
+  Trash2,
+  Flag,
+  Check,
+  ArrowRight,
+  Brain,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -19,8 +40,10 @@ function ChatThread() {
   const { threadId } = useParams({ from: "/chat/$threadId" });
   const [initial, setInitial] = useState<UIMessage[] | null>(null);
   const [conns, setConns] = useState<any[]>([]);
+  const [pendingInstagram, setPendingInstagram] = useState<any[]>([]);
   const loadMsgs = useServerFn(getThreadMessages);
   const loadConns = useServerFn(listMyConnections);
+  const loadPendingInstagram = useServerFn(listInstagramPendingReplies);
 
   useEffect(() => {
     setInitial(null);
@@ -32,7 +55,12 @@ function ChatThread() {
         setInitial([]);
       }
     })();
-    loadConns().then((r) => setConns(r.connections)).catch(() => {});
+    loadConns()
+      .then((r) => setConns(r.connections))
+      .catch(() => {});
+    loadPendingInstagram()
+      .then((r) => setPendingInstagram(r.pendingReplies))
+      .catch(() => {});
   }, [threadId]);
 
   if (initial === null) {
@@ -43,17 +71,34 @@ function ChatThread() {
     );
   }
 
-  return <ChatWindow key={threadId} threadId={threadId} initial={initial} conns={conns} />;
+  return (
+    <ChatWindow
+      key={threadId}
+      threadId={threadId}
+      initial={initial}
+      conns={conns}
+      pendingInstagram={pendingInstagram}
+      onRefreshPendingInstagram={() =>
+        loadPendingInstagram()
+          .then((r) => setPendingInstagram(r.pendingReplies))
+          .catch(() => {})
+      }
+    />
+  );
 }
 
 function ChatWindow({
   threadId,
   initial,
   conns,
+  pendingInstagram,
+  onRefreshPendingInstagram,
 }: {
   threadId: string;
   initial: UIMessage[];
   conns: any[];
+  pendingInstagram: any[];
+  onRefreshPendingInstagram: () => void;
 }) {
   const activeCount = conns.filter((c) => c.status === "ACTIVE").length;
   const storageKey = `mythmind:agent:${threadId}`;
@@ -107,6 +152,10 @@ function ChatWindow({
   useEffect(() => {
     taRef.current?.focus();
   }, [threadId, status === "ready"]);
+
+  useEffect(() => {
+    if (status === "ready") onRefreshPendingInstagram();
+  }, [status]);
 
   const submit = async () => {
     const text = input.trim();
@@ -179,6 +228,7 @@ function ChatWindow({
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="max-w-[760px] mx-auto px-6 py-8 space-y-6">
+          {pendingInstagram.length > 0 && <InstagramPendingBanner pending={pendingInstagram} />}
           {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
           {messages.map((m) => (
             <Message
@@ -229,7 +279,11 @@ function ChatWindow({
               className="absolute right-2 bottom-2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
               aria-label="Send"
             >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
+              {busy ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowUp className="w-4 h-4" />
+              )}
             </button>
           </div>
           <p className="text-[11px] text-muted-foreground text-center mt-2">
@@ -267,6 +321,25 @@ function EmptyState({ onPick }: { onPick: (t: string) => void }) {
             {s}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function InstagramPendingBanner({ pending }: { pending: any[] }) {
+  const first = pending[0];
+  return (
+    <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">Instagram reply waiting for 24-hour window</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {pending.length} queued reply{pending.length === 1 ? "" : "ies"}. When recipient{" "}
+            {first?.recipient_id} messages you first, ask the team to send pending Instagram replies
+            for that recipient.
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -400,12 +473,17 @@ function ToolCall({ part }: { part: any }) {
 function GenericToolCall({ part, name }: { part: any; name: string }) {
   const [open, setOpen] = useState(false);
   const state = part.state ?? "input-streaming";
-  const statusLabel =
-    state === "output-available"
-      ? "Done"
-      : state === "output-error"
-        ? "Error"
-        : "Running…";
+  const queued = part.output?.status === "queued";
+  const blocked = part.output?.status === "blocked" || part.output?.blocker;
+  const statusLabel = queued
+    ? "Queued"
+    : blocked
+      ? "Blocked"
+      : state === "output-available"
+        ? "Done"
+        : state === "output-error"
+          ? "Error"
+          : "Running…";
   return (
     <div className="border rounded-xl bg-muted/30">
       <button
@@ -427,11 +505,16 @@ function GenericToolCall({ part, name }: { part: any; name: string }) {
               {JSON.stringify(part.input, null, 2)}
             </pre>
           )}
-          {part.output && (
-            <pre className="bg-background rounded p-2 overflow-auto max-h-64">
-              {JSON.stringify(part.output, null, 2)}
-            </pre>
-          )}
+          {part.output &&
+            (part.output?.message ? (
+              <div className="bg-background rounded p-2 text-muted-foreground">
+                {String(part.output.message)}
+              </div>
+            ) : (
+              <pre className="bg-background rounded p-2 overflow-auto max-h-64">
+                {JSON.stringify(part.output, null, 2)}
+              </pre>
+            ))}
         </div>
       )}
     </div>
@@ -447,32 +530,47 @@ function DelegationCard({ part }: { part: any }) {
   const lin = getAgent("lin")!;
   const timeline: any[] = Array.isArray(output.timeline) ? output.timeline : [];
   const running = state !== "output-available" && state !== "output-error";
+  const queued =
+    output.status === "queued" || timeline.some((ev) => ev.output?.status === "queued");
+  const blocked =
+    output.status === "blocked" ||
+    timeline.some((ev) => ev.output?.status === "blocked" || ev.output?.status === "still_blocked");
 
   return (
     <div className="border rounded-2xl bg-gradient-to-br from-muted/40 to-background overflow-hidden">
       <div className="px-4 py-3 flex items-center gap-3 border-b bg-background/60">
-        <img src={lin.image} alt="Lin" className="w-7 h-7 rounded-full object-cover ring-2"
-             style={{ boxShadow: `0 0 0 2px ${lin.accent}` }} />
+        <img
+          src={lin.image}
+          alt="Lin"
+          className="w-7 h-7 rounded-full object-cover ring-2"
+          style={{ boxShadow: `0 0 0 2px ${lin.accent}` }}
+        />
         <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
         {sub ? (
-          <img src={sub.image} alt={sub.name} className="w-7 h-7 rounded-full object-cover ring-2"
-               style={{ boxShadow: `0 0 0 2px ${sub.accent}` }} />
+          <img
+            src={sub.image}
+            alt={sub.name}
+            className="w-7 h-7 rounded-full object-cover ring-2"
+            style={{ boxShadow: `0 0 0 2px ${sub.accent}` }}
+          />
         ) : (
           <div className="w-7 h-7 rounded-full bg-muted" />
         )}
         <div className="text-xs min-w-0 flex-1">
-          <div className="font-medium">
-            Lin → {sub?.name ?? input.employee ?? "teammate"}
-          </div>
+          <div className="font-medium">Lin → {sub?.name ?? input.employee ?? "teammate"}</div>
           <div className="text-muted-foreground truncate">{sub?.role ?? "Delegated task"}</div>
         </div>
         {running ? (
           <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" /> Working…
           </span>
-        ) : output.error ? (
+        ) : queued ? (
+          <span className="text-[11px] text-amber-600 flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3" /> Queued
+          </span>
+        ) : output.error || blocked ? (
           <span className="text-[11px] text-destructive flex items-center gap-1.5">
-            <AlertCircle className="w-3 h-3" /> Failed
+            <AlertCircle className="w-3 h-3" /> Blocked
           </span>
         ) : (
           <span className="text-[11px] text-emerald-600 flex items-center gap-1.5">
@@ -526,7 +624,9 @@ function TimelineRow({ ev }: { ev: any }) {
         <ArrowRight className="w-3 h-3" />
         Routed to <span className="font-medium text-foreground">{ev.employee}</span>
         {ev.tools?.length ? (
-          <span>· tools: <span className="font-mono">{ev.tools.join(", ")}</span></span>
+          <span>
+            · tools: <span className="font-mono">{ev.tools.join(", ")}</span>
+          </span>
         ) : (
           <span>· no integrations</span>
         )}
@@ -543,16 +643,25 @@ function TimelineRow({ ev }: { ev: any }) {
     );
   }
   if (ev.kind === "tool_result") {
-    const ok = !ev.output?.error;
+    const queued = ev.output?.status === "queued";
+    const blocked =
+      ev.output?.status === "blocked" ||
+      ev.output?.status === "still_blocked" ||
+      ev.output?.blocker;
+    const ok = !ev.output?.error && !blocked && !queued;
     return (
       <li className="text-[11px] flex items-center gap-2">
-        {ok ? (
+        {queued ? (
+          <AlertCircle className="w-3 h-3 text-amber-600" />
+        ) : ok ? (
           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
         ) : (
           <AlertCircle className="w-3 h-3 text-destructive" />
         )}
         <span className="font-mono">{ev.tool}</span>
-        <span className="text-muted-foreground">{ok ? "succeeded" : "failed"}</span>
+        <span className="text-muted-foreground">
+          {queued ? "queued until recipient replies" : ok ? "succeeded" : "blocked"}
+        </span>
       </li>
     );
   }
