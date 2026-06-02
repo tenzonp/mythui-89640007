@@ -26,19 +26,54 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
         ? (t.input_parameters as any)
         : { type: "object", properties: {} };
     const schema = raw.type ? raw : { type: "object", properties: raw };
+    const isInstagram = (t.toolkit?.slug ?? "").toLowerCase() === "instagram";
     out[safeName] = tool({
       description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}`.slice(0, 1000),
       inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
         try {
-          return await executeTool(t.slug, userId, args ?? {});
+          const res = await executeTool(t.slug, userId, args ?? {});
+          if (isInstagram && detectInstagramWindowClosed(res)) {
+            return {
+              status: "blocked",
+              blocker: "instagram_24h_window_closed",
+              error_subcode: 2534022,
+              recipient_id:
+                (args && (args.recipient_id ?? args.user_id ?? args.id)) ?? null,
+              message:
+                "Instagram's 24-hour messaging window is closed for this recipient. Do NOT retry this send — the recipient must message us first to reopen the window.",
+              raw: res,
+            };
+          }
+          return res;
         } catch (e: any) {
-          return { error: String(e?.message ?? e) };
+          const msg = String(e?.message ?? e);
+          if (isInstagram && (msg.includes("2534022") || /24.?hour/i.test(msg))) {
+            return {
+              status: "blocked",
+              blocker: "instagram_24h_window_closed",
+              error_subcode: 2534022,
+              recipient_id:
+                (args && (args.recipient_id ?? args.user_id ?? args.id)) ?? null,
+              message:
+                "Instagram's 24-hour messaging window is closed. Do NOT retry — wait for the recipient to message us first.",
+            };
+          }
+          return { error: msg };
         }
       },
     });
   }
   return out;
+}
+
+function detectInstagramWindowClosed(result: any): boolean {
+  try {
+    const s = typeof result === "string" ? result : JSON.stringify(result ?? "");
+    return s.includes("2534022") || /outside.*(24|allowed).*window/i.test(s);
+  } catch {
+    return false;
+  }
 }
 
 function buildAgentSystem(agent: Agent, allowedSlugs: string[], roster: string) {
