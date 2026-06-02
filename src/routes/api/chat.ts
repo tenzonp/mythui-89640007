@@ -120,6 +120,10 @@ function createPendingInstagramReplyTool(userId: string) {
           : "message";
         if (messageKey) toolArgs[messageKey] = row.message_text;
         try {
+          if (!row.tool_slug) {
+            results.push({ id: row.id, status: "failed", error: "Missing original Instagram send tool." });
+            continue;
+          }
           const res = await executeTool(row.tool_slug, userId, toolArgs);
           if (detectInstagramWindowClosed(res)) {
             await (supabaseAdmin as any)
@@ -186,6 +190,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
                 userId,
                 recipientId: blocked.recipientId,
                 messageText: blocked.messageText,
+                toolSlug: t.slug,
                 raw: res,
                 toolArgs: args ?? {},
               });
@@ -220,6 +225,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
                 userId,
                 recipientId: blocked.recipientId,
                 messageText: blocked.messageText,
+                toolSlug: t.slug,
                 raw: { error: msg },
                 toolArgs: args ?? {},
               });
