@@ -557,8 +557,7 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const system = buildAgentSystem(agent, allowedSlugs, roster);
-        const gateway = createLovableAiGatewayProvider(lovableKey);
-        const model = gateway("google/gemini-2.5-pro");
+        const model = deepseek(DEEPSEEK_MAIN_MODEL);
 
         const result = streamText({
           model,
