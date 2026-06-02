@@ -90,6 +90,19 @@ export const listMyConnections = createServerFn({ method: "GET" })
     return { connections: data ?? [] };
   });
 
+export const listInstagramPendingReplies = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await (context.supabase as any)
+      .from("instagram_pending_replies")
+      .select("id, recipient_id, message_text, status, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (error) throw new Error(error.message);
+    return { pendingReplies: data ?? [] };
+  });
+
 export const startComposioConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { toolkitSlug: string; origin: string }) => d)
