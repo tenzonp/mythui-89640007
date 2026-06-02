@@ -17,6 +17,64 @@ import {
 } from "@/lib/composio.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
 
+function extractByKeys(value: any, keys: string[]): string | null {
+  if (!value || typeof value !== "object") return null;
+  for (const [key, nested] of Object.entries(value)) {
+    if (keys.includes(key.toLowerCase()) && typeof nested === "string" && nested.trim()) {
+      return nested.trim();
+    }
+    if (nested && typeof nested === "object") {
+      const found = extractByKeys(nested, keys);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function extractInstagramRecipient(args: any) {
+  return extractByKeys(args, ["recipient_id", "recipientid", "user_id", "userid", "ig_user_id", "instagram_user_id", "id"]);
+}
+
+function extractInstagramMessage(args: any) {
+  return extractByKeys(args, ["message", "message_text", "messagetext", "text", "content", "body", "reply"]);
+}
+
+function isInstagramSendTool(t: ComposioTool) {
+  const haystack = `${t.slug} ${t.name ?? ""} ${t.description ?? ""}`.toLowerCase();
+  return (t.toolkit?.slug ?? "").toLowerCase() === "instagram" && /send|reply|message|dm/.test(haystack);
+}
+
+async function queueInstagramPendingReply(args: {
+  userId: string;
+  recipientId: string;
+  messageText: string;
+  raw: any;
+  toolArgs: any;
+}) {
+  const { data, error } = await (supabaseAdmin as any)
+    .from("instagram_pending_replies")
+    .insert({
+      user_id: args.userId,
+      recipient_id: args.recipientId,
+      message_text: args.messageText,
+      status: "pending",
+      error_subcode: 2534022,
+      last_error: "Instagram 24-hour messaging window is closed for this recipient.",
+      raw_error: { raw: args.raw, arguments: args.toolArgs },
+      next_retry_at: null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data?.id as string | undefined;
+}
+
+function buildInstagramWindowResponse(userId: string, args: any, raw: any) {
+  const recipientId = extractInstagramRecipient(args);
+  const messageText = extractInstagramMessage(args);
+  return { recipientId, messageText, raw, userId };
+}
+
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
@@ -27,6 +85,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
         : { type: "object", properties: {} };
     const schema = raw.type ? raw : { type: "object", properties: raw };
     const isInstagram = (t.toolkit?.slug ?? "").toLowerCase() === "instagram";
+    const isInstagramSend = isInstagramSendTool(t);
     out[safeName] = tool({
       description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}`.slice(0, 1000),
       inputSchema: jsonSchema(schema),
@@ -34,12 +93,31 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
         try {
           const res = await executeTool(t.slug, userId, args ?? {});
           if (isInstagram && detectInstagramWindowClosed(res)) {
+            const blocked = buildInstagramWindowResponse(userId, args, res);
+            if (isInstagramSend && blocked.recipientId && blocked.messageText) {
+              const pendingId = await queueInstagramPendingReply({
+                userId,
+                recipientId: blocked.recipientId,
+                messageText: blocked.messageText,
+                raw: res,
+                toolArgs: args ?? {},
+              });
+              return {
+                status: "queued",
+                blocker: "instagram_24h_window_closed",
+                error_subcode: 2534022,
+                pending_reply_id: pendingId,
+                recipient_id: blocked.recipientId,
+                message:
+                  "Instagram's 24-hour messaging window is closed, so this reply has been saved in the pending queue. Do NOT retry now; send it after the recipient messages first and reopens the window.",
+                raw: res,
+              };
+            }
             return {
               status: "blocked",
               blocker: "instagram_24h_window_closed",
               error_subcode: 2534022,
-              recipient_id:
-                (args && (args.recipient_id ?? args.user_id ?? args.id)) ?? null,
+              recipient_id: blocked.recipientId,
               message:
                 "Instagram's 24-hour messaging window is closed for this recipient. Do NOT retry this send — the recipient must message us first to reopen the window.",
               raw: res,
@@ -49,12 +127,30 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
         } catch (e: any) {
           const msg = String(e?.message ?? e);
           if (isInstagram && (msg.includes("2534022") || /24.?hour/i.test(msg))) {
+            const blocked = buildInstagramWindowResponse(userId, args, { error: msg });
+            if (isInstagramSend && blocked.recipientId && blocked.messageText) {
+              const pendingId = await queueInstagramPendingReply({
+                userId,
+                recipientId: blocked.recipientId,
+                messageText: blocked.messageText,
+                raw: { error: msg },
+                toolArgs: args ?? {},
+              });
+              return {
+                status: "queued",
+                blocker: "instagram_24h_window_closed",
+                error_subcode: 2534022,
+                pending_reply_id: pendingId,
+                recipient_id: blocked.recipientId,
+                message:
+                  "Instagram's 24-hour messaging window is closed, so this reply has been saved in the pending queue. Do NOT retry now; send it after the recipient messages first and reopens the window.",
+              };
+            }
             return {
               status: "blocked",
               blocker: "instagram_24h_window_closed",
               error_subcode: 2534022,
-              recipient_id:
-                (args && (args.recipient_id ?? args.user_id ?? args.id)) ?? null,
+              recipient_id: blocked.recipientId,
               message:
                 "Instagram's 24-hour messaging window is closed. Do NOT retry — wait for the recipient to message us first.",
             };
