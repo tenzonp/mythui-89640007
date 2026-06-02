@@ -302,8 +302,12 @@ async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[
   if (!allowedSlugs.length) return { tools: {}, allowedSlugs };
   try {
     const toolsRes = await listToolsForToolkits(userId, allowedSlugs, 25);
+    const tools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId);
+    if (hasInstagram(allowedSlugs)) {
+      tools["send_pending_instagram_replies"] = createPendingInstagramReplyTool(userId);
+    }
     return {
-      tools: composioToolsToAiSdkTools(toolsRes.items ?? [], userId),
+      tools,
       allowedSlugs,
     };
   } catch (e) {
@@ -362,6 +366,9 @@ export const Route = createFileRoute("/api/chat")({
 
         const { tools: ownTools, allowedSlugs } = await loadAgentTools(userId, agent, activeSlugs);
         const aiTools: Record<string, any> = { ...ownTools };
+        if (hasInstagram(activeSlugs) && !aiTools.send_pending_instagram_replies) {
+          aiTools.send_pending_instagram_replies = createPendingInstagramReplyTool(userId);
+        }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
