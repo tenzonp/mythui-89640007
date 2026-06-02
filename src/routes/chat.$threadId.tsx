@@ -3,7 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getThreadMessages, listMyConnections, deleteMessage } from "@/lib/chat.functions";
+import { getThreadMessages, listMyConnections, deleteMessage, listInstagramPendingReplies } from "@/lib/chat.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowUp, Loader2, Plug, Sparkles, Wrench, ChevronDown, Copy, Share2, Trash2, Flag, Check, ArrowRight, Brain, CheckCircle2, AlertCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -19,8 +19,10 @@ function ChatThread() {
   const { threadId } = useParams({ from: "/chat/$threadId" });
   const [initial, setInitial] = useState<UIMessage[] | null>(null);
   const [conns, setConns] = useState<any[]>([]);
+  const [pendingInstagram, setPendingInstagram] = useState<any[]>([]);
   const loadMsgs = useServerFn(getThreadMessages);
   const loadConns = useServerFn(listMyConnections);
+  const loadPendingInstagram = useServerFn(listInstagramPendingReplies);
 
   useEffect(() => {
     setInitial(null);
@@ -33,6 +35,7 @@ function ChatThread() {
       }
     })();
     loadConns().then((r) => setConns(r.connections)).catch(() => {});
+    loadPendingInstagram().then((r) => setPendingInstagram(r.pendingReplies)).catch(() => {});
   }, [threadId]);
 
   if (initial === null) {
@@ -43,17 +46,21 @@ function ChatThread() {
     );
   }
 
-  return <ChatWindow key={threadId} threadId={threadId} initial={initial} conns={conns} />;
+  return <ChatWindow key={threadId} threadId={threadId} initial={initial} conns={conns} pendingInstagram={pendingInstagram} onRefreshPendingInstagram={() => loadPendingInstagram().then((r) => setPendingInstagram(r.pendingReplies)).catch(() => {})} />;
 }
 
 function ChatWindow({
   threadId,
   initial,
   conns,
+  pendingInstagram,
+  onRefreshPendingInstagram,
 }: {
   threadId: string;
   initial: UIMessage[];
   conns: any[];
+  pendingInstagram: any[];
+  onRefreshPendingInstagram: () => void;
 }) {
   const activeCount = conns.filter((c) => c.status === "ACTIVE").length;
   const storageKey = `mythmind:agent:${threadId}`;
@@ -107,6 +114,10 @@ function ChatWindow({
   useEffect(() => {
     taRef.current?.focus();
   }, [threadId, status === "ready"]);
+
+  useEffect(() => {
+    if (status === "ready") onRefreshPendingInstagram();
+  }, [status]);
 
   const submit = async () => {
     const text = input.trim();
@@ -179,6 +190,7 @@ function ChatWindow({
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="max-w-[760px] mx-auto px-6 py-8 space-y-6">
+          {pendingInstagram.length > 0 && <InstagramPendingBanner pending={pendingInstagram} />}
           {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
           {messages.map((m) => (
             <Message
