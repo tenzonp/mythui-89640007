@@ -23,6 +23,7 @@ import { Route as AiEmployeesIndexRouteImport } from './routes/ai-employees.inde
 import { Route as ChatThreadIdRouteImport } from './routes/chat.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AiEmployeesAgentIdRouteImport } from './routes/ai-employees.$agentId'
+import { Route as ApiPublicInstagramWebhookRouteImport } from './routes/api/public/instagram/webhook'
 
 const SolutionsRoute = SolutionsRouteImport.update({
   id: '/solutions',
@@ -94,6 +95,12 @@ const AiEmployeesAgentIdRoute = AiEmployeesAgentIdRouteImport.update({
   path: '/ai-employees/$agentId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicInstagramWebhookRoute =
+  ApiPublicInstagramWebhookRouteImport.update({
+    id: '/api/public/instagram/webhook',
+    path: '/api/public/instagram/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
+  '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -125,6 +133,7 @@ export interface FileRoutesByTo {
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/ai-employees': typeof AiEmployeesIndexRoute
   '/chat': typeof ChatIndexRoute
+  '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -142,6 +151,7 @@ export interface FileRoutesById {
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
+  '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/ai-employees/'
     | '/chat/'
+    | '/api/public/instagram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/ai-employees'
     | '/chat'
+    | '/api/public/instagram/webhook'
   id:
     | '__root__'
     | '/'
@@ -191,6 +203,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/ai-employees/'
     | '/chat/'
+    | '/api/public/instagram/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -206,6 +219,7 @@ export interface RootRouteChildren {
   AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
   ApiChatRoute: typeof ApiChatRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
+  ApiPublicInstagramWebhookRoute: typeof ApiPublicInstagramWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -308,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiEmployeesAgentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/instagram/webhook': {
+      id: '/api/public/instagram/webhook'
+      path: '/api/public/instagram/webhook'
+      fullPath: '/api/public/instagram/webhook'
+      preLoaderRoute: typeof ApiPublicInstagramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -336,6 +357,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,
   ApiChatRoute: ApiChatRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
+  ApiPublicInstagramWebhookRoute: ApiPublicInstagramWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
