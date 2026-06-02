@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_pending_replies: {
+        Row: {
+          created_at: string
+          error_subcode: number | null
+          id: string
+          last_error: string | null
+          message_text: string
+          next_retry_at: string | null
+          raw_error: Json | null
+          recipient_id: string
+          reopened_at: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_subcode?: number | null
+          id?: string
+          last_error?: string | null
+          message_text: string
+          next_retry_at?: string | null
+          raw_error?: Json | null
+          recipient_id: string
+          reopened_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_subcode?: number | null
+          id?: string
+          last_error?: string | null
+          message_text?: string
+          next_retry_at?: string | null
+          raw_error?: Json | null
+          recipient_id?: string
+          reopened_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           created_at: string
