@@ -67,5 +67,34 @@ export function createDeepSeekProvider(apiKey: string) {
   });
 }
 
-export const DEEPSEEK_MAIN_MODEL = "deepseek-chat";
-export const DEEPSEEK_SUB_MODEL = "deepseek-chat";
+// DeepSeek model aliases always point to the latest version on their API.
+//   deepseek-chat     → latest DeepSeek-V3.x (fast, general)
+//   deepseek-reasoner → latest DeepSeek-R1.x (deep reasoning)
+export const DEEPSEEK_CHAT_MODEL = "deepseek-chat";
+export const DEEPSEEK_REASONER_MODEL = "deepseek-reasoner";
+
+// Main conversational model (CEO / direct chat) — fast, low latency.
+export const DEEPSEEK_MAIN_MODEL = DEEPSEEK_CHAT_MODEL;
+// Specialist / delegated work — uses reasoner for harder multi-step tasks.
+export const DEEPSEEK_SUB_MODEL = DEEPSEEK_REASONER_MODEL;
+
+/**
+ * Auto-pick a DeepSeek model based on task signals.
+ * - Long prompts, multi-step delegation, code/analysis → reasoner
+ * - Short conversational turns → chat
+ */
+export function pickDeepSeekModel(opts: {
+  taskText?: string;
+  isDelegated?: boolean;
+  toolCount?: number;
+}): string {
+  if (opts.isDelegated) return DEEPSEEK_REASONER_MODEL;
+  const text = opts.taskText ?? "";
+  const long = text.length > 800;
+  const complex = /\b(analy[sz]e|reason|plan|debug|architect|strategy|compare|evaluate|why|step[- ]by[- ]step)\b/i.test(
+    text,
+  );
+  const manyTools = (opts.toolCount ?? 0) >= 8;
+  return long || complex || manyTools ? DEEPSEEK_REASONER_MODEL : DEEPSEEK_CHAT_MODEL;
+}
+

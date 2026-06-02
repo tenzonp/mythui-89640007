@@ -12,6 +12,7 @@ import {
   createDeepSeekProvider,
   DEEPSEEK_MAIN_MODEL,
   DEEPSEEK_SUB_MODEL,
+  pickDeepSeekModel,
 } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
@@ -557,7 +558,28 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const system = buildAgentSystem(agent, allowedSlugs, roster);
-        const model = deepseek(DEEPSEEK_MAIN_MODEL);
+        // Auto-pick the right DeepSeek model based on the latest user turn,
+        // tool surface area, and whether the agent can delegate.
+        const lastUserText = (() => {
+          for (let i = body.messages.length - 1; i >= 0; i--) {
+            const m = body.messages[i];
+            if (m.role === "user") {
+              const parts: any[] = (m as any).parts ?? [];
+              return parts
+                .map((p) => (typeof p?.text === "string" ? p.text : ""))
+                .join(" ")
+                .trim();
+            }
+          }
+          return "";
+        })();
+        const chosenModel = pickDeepSeekModel({
+          taskText: lastUserText,
+          isDelegated: false,
+          toolCount: Object.keys(aiTools).length,
+        });
+        console.log("[chat] DeepSeek model selected:", chosenModel);
+        const model = deepseek(chosenModel);
 
         const result = streamText({
           model,
