@@ -386,8 +386,9 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("messages required", { status: 400 });
         }
 
-        const lovableKey = process.env.LOVABLE_API_KEY;
-        if (!lovableKey) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
+        const deepseekKey = process.env.DEEPSEEK_API_KEY;
+        if (!deepseekKey) return new Response("Missing DEEPSEEK_API_KEY", { status: 500 });
+        const deepseek = createDeepSeekProvider(deepseekKey);
 
         // ALL prompts flow through Lin (CEO) by default. If the user explicitly
         // picked another employee, honor it (direct DM mode).
