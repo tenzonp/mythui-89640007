@@ -17,6 +17,7 @@ import {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
 import { webSearch, webScrape } from "@/lib/firecrawl.server";
+import { runCode } from "@/lib/e2b.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
 
 function createWebSearchTool() {
@@ -75,6 +76,47 @@ function createWebFetchTool() {
         return await webScrape(parsed.data.url);
       } catch (e: any) {
         return { error: e?.message ?? "Fetch failed" };
+      }
+    },
+  });
+}
+
+function createRunCodeTool(userId: string) {
+  return tool({
+    description:
+      "Run real code in a live Linux sandbox VM (E2B). Use this WHENEVER the user asks you to: generate a PDF / PPTX / DOCX / XLSX / CSV / chart / image, do data analysis, run a calculation, scrape+process data, convert files, or execute arbitrary Python/JavaScript. Files you write inside the script will be uploaded automatically and returned as downloadable URLs — ALWAYS save outputs to a filename (e.g. `report.pdf`). Preinstalled Python libs include reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests. After the run, share the returned artifact URLs with the user as clickable links.",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["code"],
+      properties: {
+        code: {
+          type: "string",
+          description:
+            "Full source code to execute. Save any output files with a clear filename (e.g. `report.pdf`, `slides.pptx`) — do NOT print binary data.",
+        },
+        language: {
+          type: "string",
+          enum: ["python", "javascript"],
+          description: "Default 'python'.",
+        },
+      },
+    }),
+    execute: async (args: any) => {
+      const parsed = z
+        .object({
+          code: z.string().min(1).max(60_000),
+          language: z.enum(["python", "javascript"]).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success) return { error: "Invalid arguments" };
+      try {
+        return await runCode({
+          userId,
+          code: parsed.data.code,
+          language: parsed.data.language ?? "python",
+        });
+      } catch (e: any) {
+        return { error: e?.message ?? "Sandbox execution failed" };
       }
     },
   });
@@ -401,6 +443,8 @@ Connected integrations available to you right now: ${allowedSlugs.join(", ") || 
 
 LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fetch tool (read a full page). ALWAYS use web_search for anything time-sensitive, current, "latest", "today", news, prices, recent appointments, who-is-X-now type questions, or anything you're not certain about. NEVER claim you lack web/internet access — you have it. Cite the source URLs from the results in your reply.
 
+LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, image, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". Save outputs to a filename like report.pdf — generated files come back as signed download URLs you MUST share as markdown links in your reply, e.g. [report.pdf](URL). Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests.
+
 ${scopeNote}
 ${missingNote}
 
@@ -486,6 +530,10 @@ export const Route = createFileRoute("/api/chat")({
         if (process.env.FIRECRAWL_API_KEY) {
           aiTools.web_search = createWebSearchTool();
           aiTools.web_fetch = createWebFetchTool();
+        }
+        // Always-on live code sandbox (E2B) for PDFs, PPTX, charts, data crunching.
+        if (process.env.E2B_API_KEY) {
+          aiTools.run_code = createRunCodeTool(userId);
         }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
