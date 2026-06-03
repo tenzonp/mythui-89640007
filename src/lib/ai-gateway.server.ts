@@ -67,34 +67,37 @@ export function createDeepSeekProvider(apiKey: string) {
   });
 }
 
-// DeepSeek model aliases always point to the latest version on their API.
-//   deepseek-chat     → latest DeepSeek-V3.x (fast, general)
-//   deepseek-reasoner → latest DeepSeek-R1.x (deep reasoning)
-export const DEEPSEEK_CHAT_MODEL = "deepseek-chat";
-export const DEEPSEEK_REASONER_MODEL = "deepseek-reasoner";
+// DeepSeek V4 model IDs (official, as of 2026-04).
+//   deepseek-v4-pro   → flagship 1.6T MoE, top reasoning + 1M context
+//   deepseek-v4-flash → 284B MoE, fast/cheap for simple turns
+export const DEEPSEEK_PRO_MODEL = "deepseek-v4-pro";
+export const DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash";
 
-// Main conversational model (CEO / direct chat) — fast, low latency.
-export const DEEPSEEK_MAIN_MODEL = DEEPSEEK_CHAT_MODEL;
-// Specialist / delegated work — uses reasoner for harder multi-step tasks.
-export const DEEPSEEK_SUB_MODEL = DEEPSEEK_REASONER_MODEL;
+// Back-compat aliases used elsewhere in the codebase.
+export const DEEPSEEK_CHAT_MODEL = DEEPSEEK_PRO_MODEL;
+export const DEEPSEEK_REASONER_MODEL = DEEPSEEK_PRO_MODEL;
+
+// Default to V4 Pro for both the CEO chat and delegated specialists.
+export const DEEPSEEK_MAIN_MODEL = DEEPSEEK_PRO_MODEL;
+export const DEEPSEEK_SUB_MODEL = DEEPSEEK_PRO_MODEL;
 
 /**
- * Auto-pick a DeepSeek model based on task signals.
- * - Long prompts, multi-step delegation, code/analysis → reasoner
- * - Short conversational turns → chat
+ * Auto-pick a DeepSeek V4 model based on task signals.
+ * - Delegated work, long prompts, complex reasoning, many tools → V4 Pro
+ * - Short, simple conversational turns → V4 Flash
  */
 export function pickDeepSeekModel(opts: {
   taskText?: string;
   isDelegated?: boolean;
   toolCount?: number;
 }): string {
-  if (opts.isDelegated) return DEEPSEEK_REASONER_MODEL;
+  if (opts.isDelegated) return DEEPSEEK_PRO_MODEL;
   const text = opts.taskText ?? "";
   const long = text.length > 800;
   const complex = /\b(analy[sz]e|reason|plan|debug|architect|strategy|compare|evaluate|why|step[- ]by[- ]step)\b/i.test(
     text,
   );
   const manyTools = (opts.toolCount ?? 0) >= 8;
-  return long || complex || manyTools ? DEEPSEEK_REASONER_MODEL : DEEPSEEK_CHAT_MODEL;
+  return long || complex || manyTools ? DEEPSEEK_PRO_MODEL : DEEPSEEK_FLASH_MODEL;
 }
 
