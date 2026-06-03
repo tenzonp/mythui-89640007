@@ -82,11 +82,25 @@ export async function runCode(opts: {
 
   const language = opts.language ?? "python";
   const started = Date.now();
-  const sandbox = await Sandbox.create({ apiKey, timeoutMs: opts.timeoutMs ?? 120_000 });
+  const sandbox = await Sandbox.create({ apiKey, timeoutMs: opts.timeoutMs ?? 300_000 });
 
   try {
     // Ensure output dir exists, set as CWD by convention.
     await sandbox.commands.run(`mkdir -p ${OUT_DIR}`);
+
+    // Pre-install common Python libs (each runCode call gets a fresh sandbox,
+    // so we cannot rely on a previous install persisting). Run quietly; if a
+    // package is already present pip is a no-op. Skip for JS.
+    if (language === "python") {
+      try {
+        await sandbox.commands.run(
+          "pip install -q reportlab python-pptx python-docx openpyxl pypdf 2>&1 | tail -n 3 || true",
+          { timeoutMs: 120_000 },
+        );
+      } catch (e) {
+        console.error("[e2b] preinstall failed (continuing):", e);
+      }
+    }
 
     let stdout = "";
     let stderr = "";
@@ -100,7 +114,10 @@ export async function runCode(opts: {
         ? `import os\nos.chdir(${JSON.stringify(OUT_DIR)})\n`
         : `process.chdir(${JSON.stringify(OUT_DIR)});\n`;
 
-    const exec = await sandbox.runCode(prelude + opts.code, { language });
+    const exec = await sandbox.runCode(prelude + opts.code, {
+      language,
+      timeoutMs: 240_000,
+    });
     stdout = (exec.logs?.stdout ?? []).join("");
     stderr = (exec.logs?.stderr ?? []).join("");
     if (exec.error) {
