@@ -17,6 +17,7 @@ import {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
 import { webSearch, webScrape } from "@/lib/firecrawl.server";
+import { runCode } from "@/lib/e2b.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
 
 function createWebSearchTool() {
