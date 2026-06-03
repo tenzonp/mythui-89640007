@@ -81,6 +81,47 @@ function createWebFetchTool() {
   });
 }
 
+function createRunCodeTool(userId: string) {
+  return tool({
+    description:
+      "Run real code in a live Linux sandbox VM (E2B). Use this WHENEVER the user asks you to: generate a PDF / PPTX / DOCX / XLSX / CSV / chart / image, do data analysis, run a calculation, scrape+process data, convert files, or execute arbitrary Python/JavaScript. Files you write inside the script will be uploaded automatically and returned as downloadable URLs — ALWAYS save outputs to a filename (e.g. `report.pdf`). Preinstalled Python libs include reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests. After the run, share the returned artifact URLs with the user as clickable links.",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["code"],
+      properties: {
+        code: {
+          type: "string",
+          description:
+            "Full source code to execute. Save any output files with a clear filename (e.g. `report.pdf`, `slides.pptx`) — do NOT print binary data.",
+        },
+        language: {
+          type: "string",
+          enum: ["python", "javascript"],
+          description: "Default 'python'.",
+        },
+      },
+    }),
+    execute: async (args: any) => {
+      const parsed = z
+        .object({
+          code: z.string().min(1).max(60_000),
+          language: z.enum(["python", "javascript"]).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success) return { error: "Invalid arguments" };
+      try {
+        return await runCode({
+          userId,
+          code: parsed.data.code,
+          language: parsed.data.language ?? "python",
+        });
+      } catch (e: any) {
+        return { error: e?.message ?? "Sandbox execution failed" };
+      }
+    },
+  });
+}
+
 function extractByKeys(value: any, keys: string[]): string | null {
   if (!value || typeof value !== "object") return null;
   for (const [key, nested] of Object.entries(value)) {
