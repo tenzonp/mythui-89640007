@@ -398,6 +398,9 @@ Team roster:
 ${roster}
 
 Connected integrations available to you right now: ${allowedSlugs.join(", ") || "none"}.
+
+LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fetch tool (read a full page). ALWAYS use web_search for anything time-sensitive, current, "latest", "today", news, prices, recent appointments, who-is-X-now type questions, or anything you're not certain about. NEVER claim you lack web/internet access — you have it. Cite the source URLs from the results in your reply.
+
 ${scopeNote}
 ${missingNote}
 
