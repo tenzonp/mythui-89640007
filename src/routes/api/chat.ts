@@ -16,7 +16,69 @@ import {
 } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
+import { webSearch, webScrape } from "@/lib/firecrawl.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
+
+function createWebSearchTool() {
+  return tool({
+    description:
+      "Search the live web for real-time / latest info (news, current events, prices, people, recent changes). Use this whenever the user asks about anything that may have changed recently or that you don't reliably know. Returns titles, URLs and snippets — cite the URLs in your answer.",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: { type: "string", description: "Natural language search query." },
+        limit: { type: "number", description: "Max results (1-10). Default 5." },
+        recency: {
+          type: "string",
+          enum: ["hour", "day", "week", "month", "year"],
+          description: "Optional time filter for fresh results.",
+        },
+      },
+    }),
+    execute: async (args: any) => {
+      const parsed = z
+        .object({
+          query: z.string().min(1).max(500),
+          limit: z.number().int().min(1).max(10).optional(),
+          recency: z.enum(["hour", "day", "week", "month", "year"]).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success) return { error: "Invalid arguments" };
+      const tbsMap = { hour: "qdr:h", day: "qdr:d", week: "qdr:w", month: "qdr:m", year: "qdr:y" } as const;
+      try {
+        const results = await webSearch(parsed.data.query, {
+          limit: parsed.data.limit ?? 5,
+          tbs: parsed.data.recency ? tbsMap[parsed.data.recency] : undefined,
+        });
+        return { results };
+      } catch (e: any) {
+        return { error: e?.message ?? "Web search failed" };
+      }
+    },
+  });
+}
+
+function createWebFetchTool() {
+  return tool({
+    description:
+      "Fetch a specific URL and return its main content as markdown. Use after web_search when you need the full text of a result.",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["url"],
+      properties: { url: { type: "string", description: "Absolute URL to fetch." } },
+    }),
+    execute: async (args: any) => {
+      const parsed = z.object({ url: z.string().url() }).safeParse(args);
+      if (!parsed.success) return { error: "Invalid URL" };
+      try {
+        return await webScrape(parsed.data.url);
+      } catch (e: any) {
+        return { error: e?.message ?? "Fetch failed" };
+      }
+    },
+  });
+}
 
 function extractByKeys(value: any, keys: string[]): string | null {
   if (!value || typeof value !== "object") return null;
@@ -336,6 +398,9 @@ Team roster:
 ${roster}
 
 Connected integrations available to you right now: ${allowedSlugs.join(", ") || "none"}.
+
+LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fetch tool (read a full page). ALWAYS use web_search for anything time-sensitive, current, "latest", "today", news, prices, recent appointments, who-is-X-now type questions, or anything you're not certain about. NEVER claim you lack web/internet access — you have it. Cite the source URLs from the results in your reply.
+
 ${scopeNote}
 ${missingNote}
 
@@ -416,6 +481,11 @@ export const Route = createFileRoute("/api/chat")({
         const aiTools: Record<string, any> = { ...ownTools };
         if (hasInstagram(activeSlugs) && !aiTools.send_pending_instagram_replies) {
           aiTools.send_pending_instagram_replies = createPendingInstagramReplyTool(userId);
+        }
+        // Always-on live web tools (powered by Firecrawl).
+        if (process.env.FIRECRAWL_API_KEY) {
+          aiTools.web_search = createWebSearchTool();
+          aiTools.web_fetch = createWebFetchTool();
         }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
