@@ -443,6 +443,8 @@ Connected integrations available to you right now: ${allowedSlugs.join(", ") || 
 
 LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fetch tool (read a full page). ALWAYS use web_search for anything time-sensitive, current, "latest", "today", news, prices, recent appointments, who-is-X-now type questions, or anything you're not certain about. NEVER claim you lack web/internet access — you have it. Cite the source URLs from the results in your reply.
 
+LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, image, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". Save outputs to a filename (e.g. `report.pdf`) — generated files come back as signed download URLs you MUST share as markdown links in your reply (e.g. `[report.pdf](URL)`). Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests.
+
 ${scopeNote}
 ${missingNote}
 
