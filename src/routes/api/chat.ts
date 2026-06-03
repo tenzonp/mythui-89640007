@@ -529,6 +529,10 @@ export const Route = createFileRoute("/api/chat")({
           aiTools.web_search = createWebSearchTool();
           aiTools.web_fetch = createWebFetchTool();
         }
+        // Always-on live code sandbox (E2B) for PDFs, PPTX, charts, data crunching.
+        if (process.env.E2B_API_KEY) {
+          aiTools.run_code = createRunCodeTool(userId);
+        }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
