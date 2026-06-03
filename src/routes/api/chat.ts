@@ -479,6 +479,11 @@ export const Route = createFileRoute("/api/chat")({
         if (hasInstagram(activeSlugs) && !aiTools.send_pending_instagram_replies) {
           aiTools.send_pending_instagram_replies = createPendingInstagramReplyTool(userId);
         }
+        // Always-on live web tools (powered by Firecrawl).
+        if (process.env.FIRECRAWL_API_KEY) {
+          aiTools.web_search = createWebSearchTool();
+          aiTools.web_fetch = createWebFetchTool();
+        }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
