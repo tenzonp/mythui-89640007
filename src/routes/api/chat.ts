@@ -125,6 +125,98 @@ function createRunCodeTool(userId: string, employeeId?: string, employeeName?: s
   });
 }
 
+function createGenerateImageTool(
+  lovableApiKey: string,
+  userId: string,
+  employeeId?: string,
+  employeeName?: string,
+) {
+  return tool({
+    description:
+      "Generate a NEW image from a text prompt using Lovable AI (low-cost, high quality). Use this whenever the user asks to create / make / draw / design an image, logo, flag, illustration, poster, banner, social-media graphic, or any visual. Returns an artifact with a public URL — share that URL as a markdown image link `![alt](url)` so it renders inline, and also reuse the URL in follow-up tool calls (e.g. posting to Instagram, attaching to Gmail).",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["prompt"],
+      properties: {
+        prompt: { type: "string", description: "Describe the image to generate in detail." },
+        size: {
+          type: "string",
+          enum: ["1024x1024", "1024x1536", "1536x1024"],
+          description: "Image dimensions. Default 1024x1024.",
+        },
+        filename: {
+          type: "string",
+          description: "Optional file name (without extension) for the saved image.",
+        },
+      },
+    }),
+    execute: async (args: any) => {
+      const parsed = z
+        .object({
+          prompt: z.string().min(1).max(4000),
+          size: z.enum(["1024x1024", "1024x1536", "1536x1024"]).optional(),
+          filename: z.string().max(80).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success) return { error: "Invalid arguments" };
+      try {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Lovable-API-Key": lovableApiKey,
+            "Content-Type": "application/json",
+            "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-image-2",
+            prompt: parsed.data.prompt,
+            quality: "low",
+            size: parsed.data.size ?? "1024x1024",
+            n: 1,
+          }),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          return { error: `Image generation failed (${res.status}): ${txt.slice(0, 300)}` };
+        }
+        const json: any = await res.json();
+        const b64 = json?.data?.[0]?.b64_json;
+        if (!b64) return { error: "No image returned by provider" };
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const safe = (parsed.data.filename ?? "generated")
+          .replace(/[^a-zA-Z0-9._-]/g, "_")
+          .slice(0, 60);
+        const path = `${userId}/generated/${Date.now()}-${safe}.png`;
+        const { error: upErr } = await supabaseAdmin.storage
+          .from("artifacts")
+          .upload(path, bytes, { contentType: "image/png", upsert: false });
+        if (upErr) return { error: upErr.message };
+        const url = `/api/files/${encodeURIComponent(path)}`;
+        return {
+          ok: true,
+          artifacts: [
+            {
+              name: `${safe}.png`,
+              path,
+              url,
+              mime: "image/png",
+              size: bytes.byteLength,
+              isImage: true,
+              employeeId,
+              employeeName,
+            },
+          ],
+          message: `Generated image saved. Share \`![${safe}](${url})\` in the reply so the user sees it inline.`,
+        };
+      } catch (e: any) {
+        return { error: e?.message ?? "Image generation failed" };
+      }
+    },
+  });
+}
+
+
+
 function extractByKeys(value: any, keys: string[]): string | null {
   if (!value || typeof value !== "object") return null;
   for (const [key, nested] of Object.entries(value)) {
@@ -446,7 +538,9 @@ Connected integrations available to you right now: ${allowedSlugs.join(", ") || 
 
 LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fetch tool (read a full page). ALWAYS use web_search for anything time-sensitive, current, "latest", "today", news, prices, recent appointments, who-is-X-now type questions, or anything you're not certain about. NEVER claim you lack web/internet access — you have it. Cite the source URLs from the results in your reply.
 
-LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, image, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". CRITICAL: every run_code call gets a FRESH sandbox — state, pip installs, and files do NOT persist between calls. Put the ENTIRE workflow (any pip install + imports + file generation) into ONE single run_code call. Save outputs to a filename like report.pdf (do NOT print binary). The returned artifacts array contains name and url — you MUST share every artifact URL in your reply as a markdown link, e.g. [report.pdf](URL). Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests — just import them, no pip install needed.
+LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". CRITICAL: every run_code call gets a FRESH sandbox — state, pip installs, and files do NOT persist between calls. Put the ENTIRE workflow (any pip install + imports + file generation) into ONE single run_code call. Save outputs to a filename like report.pdf (do NOT print binary). The returned artifacts array contains name and url — you MUST share every artifact URL in your reply as a markdown link, e.g. [report.pdf](URL). Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests — just import them, no pip install needed.
+
+IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to then post that image somewhere (Instagram, Gmail attachment, Notion, Slack, etc.), reuse the SAME url in the next tool call (pass it as the image_url / media_url / attachment field). Typical chain: generate_image → (optional web_search for facts) → instagram/gmail/etc tool with the returned image url.
 
 ${scopeNote}
 ${missingNote}
@@ -538,6 +632,15 @@ export const Route = createFileRoute("/api/chat")({
         if (process.env.E2B_API_KEY) {
           aiTools.run_code = createRunCodeTool(userId, agent.id, agent.name);
         }
+        // Always-on image generation (Lovable AI Gateway, low-cost).
+        if (process.env.LOVABLE_API_KEY) {
+          aiTools.generate_image = createGenerateImageTool(
+            process.env.LOVABLE_API_KEY,
+            userId,
+            agent.id,
+            agent.name,
+          );
+        }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
@@ -628,6 +731,14 @@ export const Route = createFileRoute("/api/chat")({
               const subTools: Record<string, any> = { ...subLoaded.tools };
               if (process.env.E2B_API_KEY) {
                 subTools.run_code = createRunCodeTool(userId, sub.id, sub.name);
+              }
+              if (process.env.LOVABLE_API_KEY) {
+                subTools.generate_image = createGenerateImageTool(
+                  process.env.LOVABLE_API_KEY,
+                  userId,
+                  sub.id,
+                  sub.name,
+                );
               }
               try {
                 const result = streamText({
@@ -728,12 +839,61 @@ export const Route = createFileRoute("/api/chat")({
           model = deepseek(chosenModel);
         }
 
+        // For vision turns, inline image attachments as base64 data URIs so the
+        // model never has to reach back over the network to a preview URL
+        // (which often fails with "Provider returned error" on Gemini).
+        let outgoingMessages = body.messages;
+        if (hasImageAttachment) {
+          outgoingMessages = await Promise.all(
+            body.messages.map(async (m: any) => {
+              if (m.role !== "user" || !Array.isArray(m.parts)) return m;
+              const parts = await Promise.all(
+                m.parts.map(async (p: any) => {
+                  if (
+                    p?.type !== "file" ||
+                    typeof p.url !== "string" ||
+                    typeof p.mediaType !== "string" ||
+                    !p.mediaType.startsWith("image/") ||
+                    p.url.startsWith("data:")
+                  )
+                    return p;
+                  try {
+                    const u = new URL(p.url);
+                    const marker = "/api/files/";
+                    const idx = u.pathname.indexOf(marker);
+                    if (idx === -1) return p;
+                    const storagePath = decodeURIComponent(u.pathname.slice(idx + marker.length));
+                    const { data, error } = await supabaseAdmin.storage
+                      .from("artifacts")
+                      .download(storagePath);
+                    if (error || !data) return p;
+                    const buf = new Uint8Array(await data.arrayBuffer());
+                    let bin = "";
+                    const CHUNK = 0x8000;
+                    for (let i = 0; i < buf.length; i += CHUNK) {
+                      bin += String.fromCharCode.apply(
+                        null,
+                        Array.from(buf.subarray(i, i + CHUNK)) as any,
+                      );
+                    }
+                    const b64 = btoa(bin);
+                    return { ...p, url: `data:${p.mediaType};base64,${b64}` };
+                  } catch {
+                    return p;
+                  }
+                }),
+              );
+              return { ...m, parts };
+            }),
+          );
+        }
+
         const result = streamText({
           model,
           system,
           tools: aiTools,
           stopWhen: stepCountIs(50),
-          messages: await convertToModelMessages(body.messages),
+          messages: await convertToModelMessages(outgoingMessages),
         });
 
         const threadId = body.threadId;
