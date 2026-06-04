@@ -314,32 +314,9 @@ function RightSidebar() {
         </div>
       </section>
 
-      {/* Current Task */}
+      {/* Credits */}
       <section className="px-3 pb-3">
-        <div className="bg-white rounded-xl border p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-[13px] font-semibold">Current Task</div>
-            <span className="text-[10.5px] text-muted-foreground">
-              {activity.running ? "Running" : "Idle"}
-            </span>
-          </div>
-          <div className="rounded-lg border p-2.5">
-            <div className="text-[12.5px] font-medium leading-snug line-clamp-2">
-              {activity.threadTitle || "New Conversation"}
-            </div>
-            <div className="mt-2.5 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-violet rounded-full transition-all"
-                  style={{ width: `${activity.progress}%` }}
-                />
-              </div>
-              <span className="text-[10.5px] text-muted-foreground">
-                {activity.progress}%
-              </span>
-            </div>
-          </div>
-        </div>
+        <CreditsCard />
       </section>
 
       {/* Recent Artifacts */}
