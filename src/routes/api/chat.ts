@@ -1039,13 +1039,21 @@ export const Route = createFileRoute("/api/chat")({
           return false;
         })();
 
+        // Route every turn through the Lovable AI Gateway using the Wynsa
+        // model the user picked. Falls back to DeepSeek only if the gateway
+        // key is missing.
         let model: any;
-        if (hasImageAttachment && process.env.LOVABLE_API_KEY) {
+        if (process.env.LOVABLE_API_KEY) {
           const gateway = createLovableAiGatewayProvider(process.env.LOVABLE_API_KEY);
-          model = gateway("google/gemini-3-flash-preview");
-          console.log("[chat] Vision routing → gemini-3-flash-preview");
+          // Vision turns force Lady (Gemini Flash) because GPT can be slower
+          // for image attachments and we only need quick vision parsing.
+          const backendModel = hasImageAttachment
+            ? "google/gemini-2.5-flash"
+            : wynsa.backendModel;
+          model = gateway(backendModel);
+          console.log("[chat] Wynsa", wynsa.id, "→", backendModel);
         } else {
-          console.log("[chat] DeepSeek model selected:", chosenModel);
+          console.log("[chat] Fallback DeepSeek model:", chosenModel);
           model = deepseek(chosenModel);
         }
 
