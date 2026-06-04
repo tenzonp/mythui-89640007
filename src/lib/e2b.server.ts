@@ -157,6 +157,8 @@ export async function runCode(opts: {
         const bytes = await sandbox.files.read(`${OUT_DIR}/${rel}`, { format: "bytes" });
         const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer);
         const art = await uploadArtifact(opts.userId, rel, u8);
+        art.employeeId = opts.employeeId;
+        art.employeeName = opts.employeeName;
         artifacts.push(art);
       } catch (e) {
         console.error("[e2b] artifact read/upload failed:", rel, e);
