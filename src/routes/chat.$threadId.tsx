@@ -42,6 +42,34 @@ import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { agents, getAgent } from "@/data/agents";
+import { useChatActivity, type ThreadFile, type ThreadTask } from "@/lib/chat-context";
+
+type TabKey = "chat" | "files" | "tasks" | "notes";
+
+function friendlyToolLabel(name: string): { label: string; icon?: string } {
+  const n = name.toLowerCase();
+  if (n.includes("image") || n.includes("imagegen")) return { label: "Image generation" };
+  if (n.includes("gmail") || n.includes("email") || n.includes("mail"))
+    return { label: "Email" };
+  if (n.includes("instagram")) return { label: "Instagram post" };
+  if (n.includes("twitter") || n.includes("x_post")) return { label: "Twitter post" };
+  if (n.includes("linkedin")) return { label: "LinkedIn post" };
+  if (n.includes("youtube")) return { label: "YouTube" };
+  if (n.includes("notion")) return { label: "Notion doc" };
+  if (n.includes("slack")) return { label: "Slack message" };
+  if (n.includes("calendar")) return { label: "Calendar event" };
+  if (n.includes("sheet") || n.includes("excel")) return { label: "Spreadsheet" };
+  if (n.includes("firecrawl") || n.includes("search") || n.includes("web_fetch") || n.includes("research"))
+    return { label: "Research" };
+  if (n.includes("run_code") || n.includes("e2b")) return { label: "Code execution" };
+  if (n.includes("delegate")) return { label: "Delegate to teammate" };
+  if (n.includes("video")) return { label: "Video generation" };
+  return { label: name.replace(/_/g, " ") };
+}
+
+function timeAgo(d: Date) {
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 export const Route = createFileRoute("/chat/$threadId")({
   component: ChatThread,
