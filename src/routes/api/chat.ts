@@ -536,7 +536,7 @@ export const Route = createFileRoute("/api/chat")({
         }
         // Always-on live code sandbox (E2B) for PDFs, PPTX, charts, data crunching.
         if (process.env.E2B_API_KEY) {
-          aiTools.run_code = createRunCodeTool(userId);
+          aiTools.run_code = createRunCodeTool(userId, agent.id, agent.name);
         }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
