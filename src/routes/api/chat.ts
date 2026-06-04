@@ -775,10 +775,31 @@ export const Route = createFileRoute("/api/chat")({
           messages: UIMessage[];
           threadId?: string;
           agentId?: string;
+          modelId?: WynsaModelId;
         };
         if (!Array.isArray(body.messages)) {
           return new Response("messages required", { status: 400 });
         }
+
+        // Credit + plan gate
+        const requestedModelId = (body.modelId ?? "lady") as WynsaModelId;
+        const wynsa = getWynsaModel(requestedModelId);
+        const gate = await canStartTurn({ userId, modelId: wynsa.id });
+        if (!gate.ok) {
+          return new Response(
+            JSON.stringify({
+              error:
+                gate.reason === "plan_locked"
+                  ? `${wynsa.name} is available on Pro and Everest. Upgrade to use it.`
+                  : `You're out of credits. Upgrade or wait for your next refill.`,
+              code: gate.reason,
+              tier: gate.plan.tier,
+              balance: gate.balance,
+            }),
+            { status: 402, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const isFree = gate.isFree;
 
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
         if (!deepseekKey) return new Response("Missing DEEPSEEK_API_KEY", { status: 500 });
