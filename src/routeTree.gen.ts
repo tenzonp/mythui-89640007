@@ -9,9 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SolutionsRouteImport } from './routes/solutions'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -29,6 +31,11 @@ import { Route as ApiFilesSplatRouteImport } from './routes/api/files/$'
 import { Route as ApiPublicInstagramWebhookRouteImport } from './routes/api/public/instagram/webhook'
 import { Route as ApiPublicDodoWebhookRouteImport } from './routes/api/public/dodo/webhook'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SolutionsRoute = SolutionsRouteImport.update({
   id: '/solutions',
   path: '/solutions',
@@ -42,6 +49,11 @@ const ResourcesRoute = ResourcesRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -135,9 +147,11 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
+  '/terms': typeof TermsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
@@ -155,9 +169,11 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
+  '/terms': typeof TermsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
@@ -177,9 +193,11 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
+  '/terms': typeof TermsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
@@ -200,9 +218,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/integrations'
     | '/pricing'
+    | '/privacy'
     | '/profile'
     | '/resources'
     | '/solutions'
+    | '/terms'
     | '/ai-employees/$agentId'
     | '/api/chat'
     | '/chat/$threadId'
@@ -220,9 +240,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/integrations'
     | '/pricing'
+    | '/privacy'
     | '/profile'
     | '/resources'
     | '/solutions'
+    | '/terms'
     | '/ai-employees/$agentId'
     | '/api/chat'
     | '/chat/$threadId'
@@ -241,9 +263,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/integrations'
     | '/pricing'
+    | '/privacy'
     | '/profile'
     | '/resources'
     | '/solutions'
+    | '/terms'
     | '/ai-employees/$agentId'
     | '/api/chat'
     | '/chat/$threadId'
@@ -263,9 +287,11 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   IntegrationsRoute: typeof IntegrationsRoute
   PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
   SolutionsRoute: typeof SolutionsRoute
+  TermsRoute: typeof TermsRoute
   AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
   ApiChatRoute: typeof ApiChatRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
@@ -276,6 +302,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/solutions': {
       id: '/solutions'
       path: '/solutions'
@@ -295,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -433,9 +473,11 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   IntegrationsRoute: IntegrationsRoute,
   PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,
   SolutionsRoute: SolutionsRoute,
+  TermsRoute: TermsRoute,
   AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,
   ApiChatRoute: ApiChatRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,

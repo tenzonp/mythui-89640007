@@ -152,7 +152,7 @@ export const adminSetTicket = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const patch: Record<string, any> = {};
+    const patch: { status?: string; priority?: string } = {};
     if (data.status) patch.status = data.status;
     if (data.priority) patch.priority = data.priority;
     if (Object.keys(patch).length === 0) return { ok: true };
