@@ -16,7 +16,12 @@ import {
   pickDeepSeekModel,
 } from "@/lib/ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { listToolsForToolkits, executeTool, type ComposioTool } from "@/lib/composio.server";
+import {
+  listToolsForToolkits,
+  executeTool,
+  stageFileBufferForTool,
+  type ComposioTool,
+} from "@/lib/composio.server";
 import { webSearch, webScrape } from "@/lib/firecrawl.server";
 import { runCode } from "@/lib/e2b.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
@@ -211,6 +216,45 @@ function createGenerateImageTool(
       } catch (e: any) {
         return { error: e?.message ?? "Image generation failed" };
       }
+    },
+  });
+}
+
+function createListRecentFilesTool(userId: string) {
+  return tool({
+    description:
+      "List the user's stored chat artifacts/uploads so you can reuse a previous generated image, PDF, or uploaded file instead of regenerating it. Use before attaching an older file to Gmail/Instagram/Slack/etc.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Maximum files to return. Default 20, max 50." },
+      },
+    }),
+    execute: async (args: any) => {
+      const limit = Math.max(1, Math.min(Number(args?.limit ?? 20) || 20, 50));
+      const prefixes = [userId, `${userId}/generated`, `${userId}/uploads`];
+      const rows: any[] = [];
+      for (const prefix of prefixes) {
+        const { data, error } = await supabaseAdmin.storage.from("artifacts").list(prefix, {
+          limit,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+        if (error) continue;
+        for (const item of data ?? []) {
+          if (!item.name || !item.id) continue;
+          const path = `${prefix}/${item.name}`;
+          rows.push({
+            name: item.name,
+            path,
+            url: `/api/files/${encodeURIComponent(path)}`,
+            mime: guessMimeFromName(item.name),
+            size: item.metadata?.size,
+            created_at: item.created_at,
+          });
+        }
+      }
+      rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+      return { files: rows.slice(0, limit) };
     },
   });
 }
@@ -414,6 +458,26 @@ function createPendingInstagramReplyTool(userId: string) {
   });
 }
 
+function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
+  const schema = raw?.type ? { ...raw } : { type: "object", properties: raw ?? {} };
+  if (toolkitSlug?.toLowerCase() === "gmail" && schema.properties?.attachment) {
+    schema.properties = { ...schema.properties };
+    schema.properties.attachment = {
+      ...schema.properties.attachment,
+      anyOf: [
+        { type: "string", description: "Artifact URL, /api/files URL, or public URL to attach." },
+        {
+          type: "array",
+          items: { type: "string" },
+          description: "Multiple artifact URLs, /api/files URLs, or public URLs to attach.",
+        },
+        schema.properties.attachment,
+      ],
+    };
+  }
+  return schema;
+}
+
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
@@ -422,15 +486,20 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
       t.input_parameters && typeof t.input_parameters === "object"
         ? (t.input_parameters as any)
         : { type: "object", properties: {} };
-    const schema = raw.type ? raw : { type: "object", properties: raw };
+    const schema = normalizeToolInputSchema(raw, t.toolkit?.slug);
     const isInstagram = (t.toolkit?.slug ?? "").toLowerCase() === "instagram";
     const isInstagramSend = isInstagramSendTool(t);
     out[safeName] = tool({
-      description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}`.slice(0, 1000),
+      description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}${
+        (t.toolkit?.slug ?? "").toLowerCase() === "gmail"
+          ? " For attachments, pass an /api/files/... URL or artifact object to attachment; the app will stage it correctly. Do not pass guessed s3key values."
+          : ""
+      }`.slice(0, 1000),
       inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
         try {
-          const res = await executeTool(t.slug, userId, args ?? {});
+          const preparedArgs = await prepareComposioArgs(t, args ?? {});
+          const res = await executeTool(t.slug, userId, preparedArgs);
           if (isInstagram && detectInstagramWindowClosed(res)) {
             const blocked = buildInstagramWindowResponse(userId, args, res);
             if (isInstagramSend && blocked.recipientId && blocked.messageText) {
@@ -513,6 +582,117 @@ function detectInstagramWindowClosed(result: any): boolean {
   }
 }
 
+function guessMimeFromName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.endsWith(".png")) return "image/png";
+  if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+  if (n.endsWith(".webp")) return "image/webp";
+  if (n.endsWith(".gif")) return "image/gif";
+  if (n.endsWith(".pdf")) return "application/pdf";
+  return "application/octet-stream";
+}
+
+function storagePathFromFileUrl(value: string): string | null {
+  try {
+    const u = new URL(value, "https://app.local");
+    const marker = "/api/files/";
+    const idx = u.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(u.pathname.slice(idx + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+async function readFileReference(value: any) {
+  const raw =
+    typeof value === "string" ? value : value?.url || value?.href || value?.s3key || value?.path || "";
+  if (!raw || typeof raw !== "string") return null;
+  const name = String(value?.name || value?.filename || raw.split("/").pop() || "attachment").replace(
+    /[^a-zA-Z0-9._-]/g,
+    "_",
+  );
+  const explicitMime = value?.mimetype || value?.mime || value?.mediaType;
+  const storagePath = storagePathFromFileUrl(raw) || (raw.includes("/") && !/^https?:/i.test(raw) ? raw : null);
+  if (storagePath) {
+    const { data, error } = await supabaseAdmin.storage.from("artifacts").download(storagePath);
+    if (error || !data) return null;
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    return { bytes, name, mimetype: explicitMime || data.type || guessMimeFromName(name) };
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    const res = await fetch(raw);
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { bytes, name, mimetype: explicitMime || res.headers.get("content-type") || guessMimeFromName(name) };
+  }
+  return null;
+}
+
+function findStoredImageUrlInHtml(args: any): string | null {
+  const body = String(args?.body || args?.message_body || "");
+  const match = body.match(/<img[^>]+src=["']([^"']*\/api\/files\/[^"']+)["'][^>]*>/i);
+  return match?.[1] ?? null;
+}
+
+async function prepareComposioArgs(t: ComposioTool, args: any) {
+  const toolkit = (t.toolkit?.slug ?? "").toLowerCase();
+  if (toolkit !== "gmail") return args ?? {};
+  const next = { ...(args ?? {}) };
+  const attachmentSource = next.attachment ?? findStoredImageUrlInHtml(next);
+  if (!attachmentSource) return next;
+  if (Array.isArray(attachmentSource)) {
+    const staged = [];
+    for (const item of attachmentSource) {
+      const file = await readFileReference(item);
+      if (!file) continue;
+      if (file.bytes.byteLength > 24 * 1024 * 1024) {
+        throw new Error("Attachment is too large for Gmail (max ~24MB before encoding).");
+      }
+      staged.push(
+        await stageFileBufferForTool({
+          bytes: file.bytes,
+          filename: file.name,
+          mimetype: file.mimetype,
+          toolSlug: t.slug,
+          toolkitSlug: t.toolkit?.slug ?? "gmail",
+        }),
+      );
+    }
+    if (staged.length) next.attachment = staged.length === 1 ? staged[0] : staged;
+    return next;
+  }
+  if (
+    typeof attachmentSource === "object" &&
+    typeof attachmentSource?.s3key === "string" &&
+    attachmentSource?.name &&
+    attachmentSource?.mimetype
+  ) {
+    return next;
+  }
+  const file = await readFileReference(attachmentSource);
+  if (!file) return next;
+  if (file.bytes.byteLength > 24 * 1024 * 1024) {
+    throw new Error("Attachment is too large for Gmail (max ~24MB before encoding).");
+  }
+  next.attachment = await stageFileBufferForTool({
+    bytes: file.bytes,
+    filename: file.name,
+    mimetype: file.mimetype,
+    toolSlug: t.slug,
+    toolkitSlug: t.toolkit?.slug ?? "gmail",
+  });
+  for (const key of ["body", "message_body"]) {
+    if (typeof next[key] === "string") {
+      next[key] = next[key].replace(
+        /<img[^>]+src=["'][^"']*\/api\/files\/[^"']+["'][^>]*>/gi,
+        `<p><strong>AI image attached:</strong> ${next.attachment.name}</p>`,
+      );
+    }
+  }
+  return next;
+}
+
 function buildAgentSystem(agent: Agent, allowedSlugs: string[], roster: string) {
   const missingForRole = agent.toolkits.filter(
     (t) => !allowedSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
@@ -538,9 +718,9 @@ Connected integrations available to you right now: ${allowedSlugs.join(", ") || 
 
 LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fetch tool (read a full page). ALWAYS use web_search for anything time-sensitive, current, "latest", "today", news, prices, recent appointments, who-is-X-now type questions, or anything you're not certain about. NEVER claim you lack web/internet access — you have it. Cite the source URLs from the results in your reply.
 
-LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". CRITICAL: every run_code call gets a FRESH sandbox — state, pip installs, and files do NOT persist between calls. Put the ENTIRE workflow (any pip install + imports + file generation) into ONE single run_code call. Save outputs to a filename like report.pdf (do NOT print binary). The returned artifacts array contains name and url — you MUST share every artifact URL in your reply as a markdown link, e.g. [report.pdf](URL). Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests — just import them, no pip install needed.
+LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". Save outputs to a filename like report.pdf (do NOT print binary). The returned artifacts array contains name and url — you MUST share every artifact URL in your reply as a markdown link, e.g. [report.pdf](URL). User files persist as stored artifacts in chat; each run_code execution is fresh, so download prior file URLs inside the same script when needed. Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests — just import them, no pip install needed.
 
-IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to then post that image somewhere (Instagram, Gmail attachment, Notion, Slack, etc.), reuse the SAME url in the next tool call (pass it as the image_url / media_url / attachment field). Typical chain: generate_image → (optional web_search for facts) → instagram/gmail/etc tool with the returned image url.
+IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to post or email that image, reuse the SAME artifact url. For Gmail, pass the artifact url/object in the attachment field; do NOT invent or reuse an s3key. The app stages the file for Gmail automatically. Do not embed /api/files images as HTML img tags because Gmail cannot fetch private chat URLs.
 
 ${scopeNote}
 ${missingNote}
@@ -641,6 +821,7 @@ export const Route = createFileRoute("/api/chat")({
             agent.name,
           );
         }
+        aiTools.list_recent_files = createListRecentFilesTool(userId);
 
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
@@ -740,6 +921,7 @@ export const Route = createFileRoute("/api/chat")({
                   sub.name,
                 );
               }
+              subTools.list_recent_files = createListRecentFilesTool(userId);
               try {
                 const result = streamText({
                   model: subModel,
