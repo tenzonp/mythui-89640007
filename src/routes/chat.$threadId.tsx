@@ -160,6 +160,29 @@ function ChatWindow({
     agentRef.current = agentId;
   }, [agentId]);
 
+  // Wynsa model selection
+  const modelKey = `mythmind:model:${threadId}`;
+  const [modelId, setModelId] = useState<WynsaModelId>(() => {
+    if (typeof window === "undefined") return "lady";
+    return (window.localStorage.getItem(modelKey) as WynsaModelId) ?? "lady";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem(modelKey, modelId);
+  }, [modelId, modelKey]);
+  const modelRef = useRef(modelId);
+  useEffect(() => {
+    modelRef.current = modelId;
+  }, [modelId]);
+
+  // Plan tier (drives model gating)
+  const [planTier, setPlanTier] = useState<PlanTier>("free");
+  const fetchPlan = useServerFn(getMyPlan);
+  useEffect(() => {
+    fetchPlan()
+      .then((p) => setPlanTier(p.tier as PlanTier))
+      .catch(() => {});
+  }, []);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
