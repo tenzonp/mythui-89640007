@@ -68,11 +68,18 @@ async function uploadArtifact(
     .from(BUCKET)
     .upload(path, bytes, { contentType: mime, upsert: false });
   if (error) throw new Error(`Upload failed for ${fileName}: ${error.message}`);
-  const { data: signed, error: signErr } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .createSignedUrl(path, SIGNED_TTL);
-  if (signErr) throw new Error(`Sign failed for ${fileName}: ${signErr.message}`);
-  return { name: safe, path, url: signed.signedUrl, size: bytes.byteLength, mime };
+  const isImage = mime.startsWith("image/");
+  const isPdf = mime.includes("pdf");
+  let pageCount: number | undefined;
+  if (isPdf) {
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+      pageCount = doc.getPageCount();
+    } catch {}
+  }
+  const url = `/api/files/${encodeURIComponent(path)}`;
+  return { name: safe, path, url, size: bytes.byteLength, mime, isImage, isPdf, pageCount };
 }
 
 export async function runCode(opts: {
