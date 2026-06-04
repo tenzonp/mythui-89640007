@@ -33,10 +33,11 @@ export async function createDodoCheckout(opts: {
       quantity: 1,
       payment_link: true,
       return_url: opts.returnUrl,
-      customer: { email: opts.email },
+      customer: { email: opts.email, name: opts.email.split("@")[0] },
       metadata: { user_id: opts.userId, tier: opts.tier },
-      billing: { country: "US" },
+      billing: { country: "US", state: "", city: "", street: "", zipcode: "" },
     }),
+
   });
 
   if (!res.ok) {
