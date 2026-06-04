@@ -418,55 +418,93 @@ function ChatWindow({
         )
     : conns.filter((c) => c.status === "ACTIVE");
 
+  const threadTitle = useMemo(() => {
+    const first = messages.find((m) => m.role === "user");
+    if (!first) return "New Conversation";
+    const txt = (first.parts as any[])
+      .map((p) => (p?.type === "text" ? p.text : ""))
+      .join(" ")
+      .trim();
+    return txt ? txt.slice(0, 72) : "New Conversation";
+  }, [messages]);
+  void allowedSlugs;
+
   return (
     <>
-      <div className="border-b px-6 py-3 flex items-center justify-between bg-background/80 backdrop-blur gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <img
-            src={agent.image}
-            alt={agent.name}
-            className="w-8 h-8 rounded-full object-cover ring-2"
-            style={{ boxShadow: `0 0 0 2px ${agent.accent}` }}
-          />
-          <div className="min-w-0">
-            <div className="text-sm font-medium leading-tight">{agent.name}</div>
-            <div className="text-[11px] text-muted-foreground truncate">{agent.role}</div>
+      <div className="border-b bg-white">
+        <div className="px-8 pt-5 pb-2 flex items-center justify-between gap-3">
+          <h1 className="text-[20px] font-semibold tracking-tight truncate">{threadTitle}</h1>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  navigator.clipboard?.writeText(window.location.href);
+                  toast.success("Link copied");
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border hover:bg-accent"
+            >
+              <Share2 className="w-4 h-4" /> Share
+            </button>
+            <Link
+              to="/integrations"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border hover:bg-accent text-muted-foreground"
+              title={`${activeCount} integrations connected`}
+            >
+              <Plug className="w-3.5 h-3.5" />
+              {activeCount}
+            </Link>
+            <button
+              className="w-8 h-8 rounded-lg border hover:bg-accent inline-flex items-center justify-center text-muted-foreground"
+              aria-label="More"
+            >
+              ···
+            </button>
           </div>
-          <select
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-            className="ml-2 text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
-            aria-label="Choose employee"
-          >
-            <option value="lin">Lin — CEO (auto-routes the team)</option>
-            {agents
-              .filter((a) => a.id !== "lin")
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} — {a.role} (direct)
-                </option>
-              ))}
-          </select>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="text-[11px] px-2 py-1 rounded-full border text-muted-foreground"
-            title={
-              agent.toolkits.length
-                ? `Allowed: ${agent.toolkits.join(", ")}`
-                : "CEO has access to all your integrations"
-            }
-          >
-            <Wrench className="inline w-3 h-3 mr-1" />
-            {allowedSlugs.length}/{agent.toolkits.length || activeCount} tools
-          </span>
-          <Link
-            to="/integrations"
-            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border hover:bg-accent"
-          >
-            <Plug className="w-3 h-3" />
-            {activeCount} connected
-          </Link>
+        <div className="px-8 flex items-center gap-6 text-sm">
+          {[
+            { k: "chat", label: "Chat" },
+            { k: "files", label: "Files" },
+            { k: "tasks", label: "Tasks" },
+            { k: "notes", label: "Notes" },
+          ].map((t, i) => (
+            <button
+              key={t.k}
+              className={
+                "py-2.5 -mb-px border-b-2 " +
+                (i === 0
+                  ? "border-violet text-foreground font-medium"
+                  : "border-transparent text-muted-foreground hover:text-foreground")
+              }
+            >
+              {t.label}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 py-1.5">
+            <img
+              src={agent.image}
+              alt={agent.name}
+              className="w-5 h-5 rounded-full object-cover"
+            />
+            <select
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
+              aria-label="Choose employee"
+            >
+              <option value="lin">Lin — CEO (auto-routes the team)</option>
+              {agents
+                .filter((a) => a.id !== "lin")
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} — {a.role}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
       </div>
 
