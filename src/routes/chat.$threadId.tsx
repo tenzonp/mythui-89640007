@@ -1488,6 +1488,16 @@ function ToolCall({ part }: { part: any }) {
   return <GenericToolCall part={part} name={name} />;
 }
 
+const BUILD_STEPS = [
+  { key: "brief", label: "Reading brief & business knowledge", emoji: "🧠" },
+  { key: "design", label: "Designing layout & visual system", emoji: "🎨" },
+  { key: "code", label: "Writing Next.js pages & components", emoji: "💻" },
+  { key: "assets", label: "Sourcing imagery & icons", emoji: "🖼️" },
+  { key: "zip", label: "Packaging project ZIP", emoji: "📦" },
+  { key: "deploy", label: "Deploying to Vercel", emoji: "🚀" },
+] as const;
+const STEP_DURATIONS = [10, 25, 50, 15, 8, 9999]; // seconds per step; last waits for completion
+
 function WebsiteBuildCard({ part }: { part: any }) {
   const state = part.state ?? "input-streaming";
   const input = part.input ?? {};
@@ -1499,23 +1509,58 @@ function WebsiteBuildCard({ part }: { part: any }) {
   const fileCount: number | undefined = output?.file_count;
   const siteName: string | undefined = input?.name;
 
+  const startedAtRef = useRef<number>(Date.now());
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [running]);
+
+  const secs = Math.floor((Date.now() - startedAtRef.current) / 1000);
+  let activeIdx = 0;
+  let acc = 0;
+  for (let i = 0; i < BUILD_STEPS.length; i++) {
+    acc += STEP_DURATIONS[i];
+    if (secs < acc) { activeIdx = i; break; }
+    activeIdx = i;
+  }
+  if (running && activeIdx >= BUILD_STEPS.length - 1) activeIdx = BUILD_STEPS.length - 1;
+  if (!running && !failed) activeIdx = BUILD_STEPS.length;
+
   const statusLabel = running ? "Building & deploying…" : failed ? "Failed" : "Live";
   const statusColor = running ? "bg-amber-500" : failed ? "bg-destructive" : "bg-emerald-500";
+  const reyes = getAgent("reyes");
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  const elapsedLabel = mins > 0 ? `${mins}m ${rem}s` : `${secs}s`;
 
   return (
     <div className="border rounded-2xl overflow-hidden bg-gradient-to-br from-violet/5 via-background to-background">
       <div className="px-4 py-3 flex items-center gap-3 border-b bg-background/60">
-        <div className="w-9 h-9 rounded-lg bg-violet/10 text-violet flex items-center justify-center">
-          <FileCode2 className="w-4 h-4" />
+        <div className="relative shrink-0">
+          {reyes?.image ? (
+            <img src={reyes.image} alt={reyes.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-violet/30" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-violet/10 text-violet flex items-center justify-center">
+              <FileCode2 className="w-4 h-4" />
+            </div>
+          )}
+          {running && (
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-background animate-pulse" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">
             {siteName ? `Website · ${siteName}` : "Website build"}
           </div>
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
             <span className={`w-1.5 h-1.5 rounded-full ${statusColor} ${running ? "animate-pulse" : ""}`} />
-            {statusLabel}
-            {fileCount ? <span>· {fileCount} files</span> : null}
+            <span>{statusLabel}</span>
+            <span>·</span>
+            <span>{reyes?.name ?? "Reyes"} — {reyes?.role ?? "Product & Innovation"}</span>
+            {running && <><span>·</span><span className="tabular-nums">{elapsedLabel}</span></>}
+            {fileCount ? <><span>·</span><span>{fileCount} files</span></> : null}
           </div>
         </div>
       </div>
@@ -1526,6 +1571,41 @@ function WebsiteBuildCard({ part }: { part: any }) {
           {String(input.prompt).length > 220 ? "…" : ""}
         </div>
       )}
+
+      {(running || failed) && (
+        <div className="px-4 py-3 border-b">
+          <ol className="space-y-1.5">
+            {BUILD_STEPS.map((s, i) => {
+              const done = i < activeIdx;
+              const active = running && i === activeIdx;
+              return (
+                <li key={s.key} className="flex items-center gap-2.5 text-xs">
+                  <span className={cn(
+                    "w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 transition-colors",
+                    done ? "bg-emerald-500/15 text-emerald-600" :
+                    active ? "bg-violet/15 text-violet" :
+                    "bg-muted text-muted-foreground/60",
+                  )}>
+                    {done ? <Check className="w-3 h-3" /> : active ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>{i + 1}</span>}
+                  </span>
+                  <span className={cn(
+                    "truncate",
+                    done ? "text-foreground/70" : active ? "text-foreground font-medium" : "text-muted-foreground/70",
+                  )}>
+                    <span className="mr-1.5">{s.emoji}</span>{s.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          {running && secs > 90 && (
+            <div className="mt-3 text-[11px] text-muted-foreground italic">
+              Production-grade sites can take 1–3 minutes. Hang tight — Reyes is hand-crafting your pages.
+            </div>
+          )}
+        </div>
+      )}
+
       {failed && (
         <div className="px-4 py-3 text-xs text-destructive">
           {String(output?.error ?? "Build failed")}
@@ -1559,12 +1639,6 @@ function WebsiteBuildCard({ part }: { part: any }) {
               <Download className="w-4 h-4 text-muted-foreground shrink-0" />
             </a>
           )}
-        </div>
-      )}
-      {running && (
-        <div className="px-4 py-4 text-xs text-muted-foreground flex items-center gap-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          Generating pages, packaging ZIP and deploying to Vercel…
         </div>
       )}
     </div>
