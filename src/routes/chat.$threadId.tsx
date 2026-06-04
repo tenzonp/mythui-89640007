@@ -879,12 +879,41 @@ function Lightbox({
       >
         <Download className="w-5 h-5" />
       </a>
-      <img
-        src={img.url}
-        alt={img.filename ?? "image"}
-        className="max-h-[90vh] max-w-[92vw] object-contain"
-        onClick={(e) => e.stopPropagation()}
-      />
+      {(() => {
+        const { isImage, isVideo, isPdf } = classifyFile(img);
+        const name = img.filename ?? img.name ?? "file";
+        if (isVideo) {
+          return (
+            <video
+              key={img.url}
+              src={img.url}
+              controls
+              autoPlay
+              className="max-h-[90vh] max-w-[92vw] bg-black"
+              onClick={(e) => e.stopPropagation()}
+            />
+          );
+        }
+        if (isPdf) {
+          return (
+            <iframe
+              key={img.url}
+              src={img.url}
+              title={name}
+              className="w-[92vw] h-[90vh] bg-white rounded"
+              onClick={(e) => e.stopPropagation()}
+            />
+          );
+        }
+        return (
+          <img
+            src={img.url}
+            alt={isImage ? name : "preview"}
+            className="max-h-[90vh] max-w-[92vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+      })()}
       {images.length > 1 && (
         <>
           <button
