@@ -1,126 +1,35 @@
-# Wynsa Models + Plans + Credits
+## Scope
 
-## 1. Models (Wynsa branding, hidden GPT/Gemini under the hood)
+Three features in one batch. Iscilla Technologies / iscillatechnologies@gmail.com / Nepal as legal entity.
 
-Replace the agent dropdown in the chat top bar with a model picker:
+### 1. Legal pages
+- `/terms` and `/privacy` routes — full content for SaaS (accounts, payments via Dodo, AI usage, cookies, data retention, Nepal jurisdiction, contact email).
+- Footer links added to `SiteChrome`.
 
-| User-facing | Backend model            | Plan access            | Effort label |
-|-------------|--------------------------|------------------------|--------------|
-| Wynsa Lady  | google/gemini-2.5-flash  | Free, Pro, Everest     | Smart        |
-| Wynsa Yeti  | openai/gpt-5-mini        | Pro, Everest           | Expert       |
-| Wynsa Mt.   | openai/gpt-5             | Pro, Everest           | Executive    |
+### 2. Admin support system (`/grow/admin`)
+- Migration: `app_role` enum (`admin`, `moderator`, `user`), `user_roles` table, `has_role()` security-definer fn, `support_tickets` table (id, user_id, subject, status, priority, created_at), `ticket_messages` table (id, ticket_id, sender_id, body, created_at) + RLS + GRANTs.
+- User-facing `/support` route: list own tickets, create new, reply thread.
+- Admin route `/grow/admin`: gated by `has_role(uid,'admin')` — ticket inbox, filter by status, open ticket detail, reply as staff, change status/priority, basic user lookup (email → tickets + plan + credits).
+- Realtime updates via Supabase channels on `ticket_messages`.
+- You'll seed your own admin role manually (I'll provide one-line SQL after migration).
 
-- Locked tiers show a lock icon + "Upgrade" hover state.
-- Agent selection (Lin/Reyes/Vale/…) moves to a small chevron next to the model — same dropdown UX but a separate field. Keeps existing agent-routing logic intact.
+### 3. AI website builder + Vercel deploy
+- New secret: `VERCEL_TOKEN` (your token; sites deploy under your Vercel account).
+- Migration: `user_sites` table (id, user_id, name, prompt, files jsonb, vercel_project_id, deployment_url, status, created_at).
+- `/sites` route — list user sites + "Create new site" form (name + freeform prompt + style notes).
+- Server fn `generateSite`: calls Lovable AI Gateway (Gemini Pro) with a structured prompt that returns JSON `{ files: [{path, content}] }` for a **Next.js 14 app-router project** (package.json, app/layout.tsx, app/page.tsx, components/*, tailwind config, etc.). Charges credits (heavy tier).
+- Server fn `deploySite`: POSTs files to `https://api.vercel.com/v13/deployments` with `projectSettings: { framework: 'nextjs' }`. Saves returned URL (`https://<name>-<hash>.vercel.app`) to `user_sites.deployment_url`.
+- `/sites/$siteId` detail page: file tree preview, live URL button, "Regenerate" and "Redeploy" actions.
+- Cost: 1000 credits per generate, 200 per redeploy (configurable).
 
-## 2. Plans
+### Technical notes
+- Vercel v13 deployments accept inline file uploads (`files: [{file, data, encoding}]`) — no git required. Each deploy creates a new immutable URL; we store the latest.
+- AI is prompted to keep projects small (<25 files) so the JSON fits within model output limits. Larger projects can be iterated via follow-up "edit site" prompts later.
+- All Vercel calls happen server-side via `process.env.VERCEL_TOKEN`; token never touches client.
+- Admin gate uses `requireSupabaseAuth` middleware + `has_role` RPC check inside each admin server fn.
 
-| Plan    | Price        | Monthly credits | Daily free credits | Notes                       |
-|---------|--------------|-----------------|--------------------|-----------------------------|
-| Free    | $0           | —               | 100 / day          | Lady only                   |
-| Pro     | $29 / mo     | 15,000          | —                  | Lady + Yeti + Mt.           |
-| Everest | $99 / mo     | 40,000          | —                  | All models + priority + multi-agent |
-
-## 3. Credit system (complexity-weighted, hidden model cost)
-
-Credits charged per assistant turn using:
-
-```
-credits = base(model) × complexity(turn) × time_factor + research_bonus + (agents − 1) × multi_agent_bonus
-```
-
-- `base(model)`: Lady=1, Yeti=2, Mt.=4
-- `complexity`: derived from output token count + tool-call count (5/20/60/150/300 buckets → Quick/Standard/Deep/Heavy/Multi)
-- `research_bonus`: +20 if firecrawl/web_search tool used
-- `multi_agent_bonus`: +30 per additional employee delegated to
-- Free users: minimum 10 credits per turn (so 100/day ≈ ~10 meaningful tasks, prevents abuse).
-
-Charged **after** the assistant turn completes, in a single ledger insert. Insufficient balance → soft block with upgrade CTA before the turn starts (estimate = base × 10 floor).
-
-UI shows only an **Effort meter** (Basic/Smart/Expert/Executive) — never a token count.
-
-## 4. Database (new migration)
-
-```sql
--- Plans / subscriptions
-create type public.plan_tier as enum ('free','pro','everest');
-create table public.user_plans (
-  user_id uuid primary key references auth.users on delete cascade,
-  tier plan_tier not null default 'free',
-  monthly_credits int not null default 0,
-  renews_at timestamptz,
-  dodo_subscription_id text,
-  updated_at timestamptz not null default now()
-);
-
--- Credit ledger (append-only)
-create table public.credit_ledger (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users on delete cascade,
-  thread_id uuid references public.threads on delete set null,
-  kind text not null check (kind in ('grant_monthly','grant_daily','spend','refund','adjust')),
-  amount int not null,           -- positive = credit, negative = spend
-  model text,
-  agent_id text,
-  complexity text,               -- 'quick'|'standard'|'deep'|'heavy'|'multi'
-  meta jsonb default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-create index on public.credit_ledger (user_id, created_at desc);
-
--- Daily free-credit anchor (so we know when to mint new 100)
-create table public.daily_grants (
-  user_id uuid not null references auth.users on delete cascade,
-  grant_date date not null,
-  primary key (user_id, grant_date)
-);
-```
-
-All three get GRANTs + RLS scoped to `auth.uid()`. A SECURITY DEFINER function `get_balance(uid)` returns `sum(amount)` from the ledger.
-
-## 5. Server functions / routes
-
-- `getMyPlan()` → plan tier, balance, daily grant info.
-- `pickModel({ modelId })` → validates user is allowed for tier.
-- `/api/chat` (existing): before streaming, call `ensureGrants(userId)` (mints daily 100 for free users if today missing, mints monthly on plan-renews_at flip). Then estimate min cost, return 402 if insufficient. After stream completes, compute final credits and insert spend row.
-- `/api/public/dodo/webhook` — verifies Dodo signature, handles `subscription.created/renewed/cancelled` → updates `user_plans` + mints monthly grant.
-
-## 6. UI changes
-
-- **Top bar (chat)**: model picker (3 tiles in dropdown with Effort label, locks on gated tiers) + small agent picker.
-- **Right sidebar**: replace progress with **Credits** card — balance, plan tier badge, "Upgrade" button when free.
-- **New `/billing` route**: shows current plan, balance, ledger (last 30), three plan cards with Upgrade buttons → Dodo checkout link.
-- **Settings entry** in left rail renamed to "Plan & Billing".
-
-## 7. Dodo Payments
-
-Dodo isn't a Lovable built-in. To go live we need:
-- `DODO_API_KEY` and `DODO_WEBHOOK_SECRET` (I'll request via `add_secret`).
-- Three product/price IDs (Pro monthly, Everest monthly) created in Dodo dashboard — user pastes IDs.
-
-Until those are provided, the Upgrade buttons hit a stub that toggles the tier in dev so the rest is testable end-to-end. The webhook handler ships in this change so flipping the live key just works.
-
-## 8. Out of scope for this turn
-
-- Annual plans / proration.
-- Team seats.
-- In-app credit purchases (top-ups).
-- Per-agent credit limits.
-
----
-
-**Files touched (≈11)**
-
-- `supabase/migrations/<new>.sql`
-- `src/lib/plans.ts` (shared constants: models, plans, pricing)
-- `src/lib/credits.server.ts` (estimate/charge/grant helpers)
-- `src/lib/credits.functions.ts` (getMyPlan, getLedger)
-- `src/lib/dodo.server.ts`
-- `src/routes/api/chat.ts` (credit gate + post-turn charge)
-- `src/routes/api/public/dodo/webhook.ts` (new)
-- `src/routes/chat.$threadId.tsx` (model picker, hide agent select behind chevron)
-- `src/routes/chat.tsx` (sidebar: Credits card)
-- `src/routes/billing.tsx` (new)
-- `src/data/agents.ts` (effort labels, untouched names)
-
-If this looks right I'll start with the migration + plans constants + UI, then layer the credit engine and Dodo last. **Confirm or tell me what to change** (e.g. pricing, model mapping, skip Dodo for now).
+### Out of scope (call out for follow-up)
+- Per-user Vercel accounts (sites deploy under your team for now).
+- Custom domains on generated sites.
+- Live in-browser site editor (only regenerate from new prompt this round).
+- Ticket email notifications.
