@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 import {
   createDeepSeekProvider,
+  createLovableAiGatewayProvider,
   DEEPSEEK_MAIN_MODEL,
   DEEPSEEK_SUB_MODEL,
   pickDeepSeekModel,
