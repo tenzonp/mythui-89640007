@@ -89,8 +89,8 @@ export const createAndDeploySite = createServerFn({ method: "POST" })
         .update({ files, status: "deploying" })
         .eq("id", site.id);
 
-      const { deployToVercel } = await import("./vercel.server");
-      const dep = await deployToVercel({ name: data.name, files });
+      const { deployToNetlify } = await import("./netlify.server");
+      const dep = await deployToNetlify({ name: data.name, files });
 
       await supabaseAdmin
         .from("user_sites")
@@ -127,8 +127,8 @@ export const redeploySite = createServerFn({ method: "POST" })
     await chargeCredits(context.userId, REDEPLOY_COST, { kind: "site_redeploy", site_id: site.id });
     await supabaseAdmin.from("user_sites").update({ status: "deploying" }).eq("id", site.id);
     try {
-      const { deployToVercel } = await import("./vercel.server");
-      const dep = await deployToVercel({
+      const { deployToNetlify } = await import("./netlify.server");
+      const dep = await deployToNetlify({
         name: site.name,
         files: site.files as any,
       });

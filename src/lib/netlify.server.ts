@@ -50,7 +50,7 @@ export async function deployToNetlify(opts: {
   const depRes = await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/zip" },
-    body: zipBytes,
+    body: zipBytes as unknown as BodyInit,
   });
   if (!depRes.ok) {
     throw new Error(`Netlify deploy failed: ${depRes.status} ${(await depRes.text()).slice(0, 400)}`);

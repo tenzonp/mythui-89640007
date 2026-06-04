@@ -1491,12 +1491,12 @@ function ToolCall({ part }: { part: any }) {
 const BUILD_STEPS = [
   { key: "brief", label: "Reading brief & business knowledge", emoji: "🧠" },
   { key: "design", label: "Designing layout & visual system", emoji: "🎨" },
-  { key: "code", label: "Writing Next.js pages & components", emoji: "💻" },
+  { key: "code", label: "Writing HTML, CSS & JS", emoji: "💻" },
   { key: "assets", label: "Sourcing imagery & icons", emoji: "🖼️" },
-  { key: "zip", label: "Packaging project ZIP", emoji: "📦" },
-  { key: "deploy", label: "Deploying to Vercel", emoji: "🚀" },
+  { key: "zip", label: "Packaging static bundle", emoji: "📦" },
+  { key: "deploy", label: "Deploying to Netlify", emoji: "🚀" },
 ] as const;
-const STEP_DURATIONS = [10, 25, 50, 15, 8, 9999]; // seconds per step; last waits for completion
+const STEP_DURATIONS = [4, 12, 25, 8, 4, 9999]; // seconds per step; last waits for completion
 
 function WebsiteBuildCard({ part }: { part: any }) {
   const state = part.state ?? "input-streaming";
