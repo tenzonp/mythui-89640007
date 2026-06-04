@@ -33,6 +33,10 @@ import {
   FileText,
   Image as ImageIcon,
   File as FileIcon,
+  Play,
+  Video as VideoIcon,
+  RotateCw,
+  UploadCloud,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
