@@ -431,11 +431,16 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
     const isInstagram = (t.toolkit?.slug ?? "").toLowerCase() === "instagram";
     const isInstagramSend = isInstagramSendTool(t);
     out[safeName] = tool({
-      description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}`.slice(0, 1000),
+      description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}${
+        (t.toolkit?.slug ?? "").toLowerCase() === "gmail"
+          ? " For attachments, pass an /api/files/... URL or artifact object to attachment; the app will stage it correctly. Do not pass guessed s3key values."
+          : ""
+      }`.slice(0, 1000),
       inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
         try {
-          const res = await executeTool(t.slug, userId, args ?? {});
+          const preparedArgs = await prepareComposioArgs(t, args ?? {});
+          const res = await executeTool(t.slug, userId, preparedArgs);
           if (isInstagram && detectInstagramWindowClosed(res)) {
             const blocked = buildInstagramWindowResponse(userId, args, res);
             if (isInstagramSend && blocked.recipientId && blocked.messageText) {
