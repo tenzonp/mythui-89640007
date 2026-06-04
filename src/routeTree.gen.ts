@@ -17,6 +17,7 @@ import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ChatRouteImport } from './routes/chat'
@@ -74,6 +75,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegrationsRoute = IntegrationsRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof ChatRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
+  '/knowledge': typeof KnowledgeRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/billing': typeof BillingRoute
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
+  '/knowledge': typeof KnowledgeRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/chat': typeof ChatRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
+  '/knowledge': typeof KnowledgeRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dashboard'
     | '/integrations'
+    | '/knowledge'
     | '/pricing'
     | '/privacy'
     | '/profile'
@@ -289,6 +299,7 @@ export interface FileRouteTypes {
     | '/billing'
     | '/dashboard'
     | '/integrations'
+    | '/knowledge'
     | '/pricing'
     | '/privacy'
     | '/profile'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dashboard'
     | '/integrations'
+    | '/knowledge'
     | '/pricing'
     | '/privacy'
     | '/profile'
@@ -346,6 +358,7 @@ export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   IntegrationsRoute: typeof IntegrationsRoute
+  KnowledgeRoute: typeof KnowledgeRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -419,6 +432,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integrations': {
@@ -591,6 +611,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
   DashboardRoute: DashboardRoute,
   IntegrationsRoute: IntegrationsRoute,
+  KnowledgeRoute: KnowledgeRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
