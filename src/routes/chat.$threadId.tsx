@@ -153,22 +153,29 @@ function ChatWindow({
   const fnDeleteMsg = useServerFn(deleteMessage);
 
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<
-    {
-      name: string;
-      url: string;
-      mime: string;
-      size: number;
-      isImage: boolean;
-      isPdf?: boolean;
-      pageCount?: number;
-    }[]
-  >([]);
-  const [uploading, setUploading] = useState(false);
+  type Att = {
+    id: string;
+    name: string;
+    mime: string;
+    size: number;
+    url?: string;
+    isImage?: boolean;
+    isPdf?: boolean;
+    isVideo?: boolean;
+    pageCount?: number;
+    thumbnail?: string; // data URL for video preview / image preview
+    status: "uploading" | "ready" | "error";
+    progress: number; // 0..100
+    error?: string;
+    _file?: File;
+  };
+  const [attachments, setAttachments] = useState<Att[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const fnUpload = useServerFn(uploadAttachment);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const uploading = attachments.some((a) => a.status === "uploading");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -182,45 +189,206 @@ function ChatWindow({
     if (status === "ready") onRefreshPendingInstagram();
   }, [status]);
 
-  const onPickFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setUploading(true);
+  const patchAtt = (id: string, patch: Partial<Att>) =>
+    setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+
+  const uploadOne = async (att: Att, attempt = 1): Promise<void> => {
+    const f = att._file!;
     try {
-      const next = [...attachments];
-      for (const f of Array.from(files).slice(0, 6)) {
-        if (f.size > 20 * 1024 * 1024) {
-          toast.error(`${f.name} is over 20MB`);
-          continue;
-        }
-        const buf = await f.arrayBuffer();
-        let bin = "";
-        const u8 = new Uint8Array(buf);
-        for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-        const dataBase64 = btoa(bin);
-        try {
-          const r = await fnUpload({
-            data: { name: f.name, dataBase64, mime: f.type || undefined },
-          });
-          next.push(r);
-        } catch (e: any) {
-          toast.error(e?.message ?? "Upload failed");
-        }
+      // Reading phase progress: 0 → 25
+      patchAtt(att.id, { status: "uploading", progress: 5, error: undefined });
+      const buf = await f.arrayBuffer();
+      patchAtt(att.id, { progress: 25 });
+      let bin = "";
+      const u8 = new Uint8Array(buf);
+      const CHUNK = 0x8000;
+      for (let i = 0; i < u8.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(
+          null,
+          Array.from(u8.subarray(i, i + CHUNK)) as any,
+        );
       }
-      setAttachments(next);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      const dataBase64 = btoa(bin);
+      patchAtt(att.id, { progress: 55 });
+
+      // Smooth progress while server fn runs
+      const ticker = setInterval(() => {
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === att.id && a.status === "uploading" && a.progress < 92
+              ? { ...a, progress: a.progress + 3 }
+              : a,
+          ),
+        );
+      }, 350);
+
+      try {
+        const r = await fnUpload({
+          data: { name: f.name, dataBase64, mime: f.type || undefined },
+        });
+        clearInterval(ticker);
+        patchAtt(att.id, {
+          status: "ready",
+          progress: 100,
+          url: r.url,
+          mime: r.mime,
+          size: r.size,
+          isImage: r.isImage,
+          isPdf: r.isPdf,
+          pageCount: r.pageCount,
+        });
+      } finally {
+        clearInterval(ticker);
+      }
+    } catch (e: any) {
+      if (attempt < 3) {
+        await new Promise((res) => setTimeout(res, 600 * attempt));
+        return uploadOne(att, attempt + 1);
+      }
+      patchAtt(att.id, { status: "error", error: e?.message ?? "Upload failed" });
+      toast.error(`${f.name}: ${e?.message ?? "Upload failed"}`);
     }
+  };
+
+  const makeVideoThumb = (file: File): Promise<string | undefined> =>
+    new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.src = url;
+        v.onloadedmetadata = () => {
+          try {
+            v.currentTime = Math.min(0.5, (v.duration || 1) / 2);
+          } catch {
+            resolve(undefined);
+          }
+        };
+        v.onseeked = () => {
+          try {
+            const c = document.createElement("canvas");
+            c.width = v.videoWidth || 320;
+            c.height = v.videoHeight || 180;
+            const ctx = c.getContext("2d");
+            if (!ctx) return resolve(undefined);
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            resolve(c.toDataURL("image/jpeg", 0.7));
+          } catch {
+            resolve(undefined);
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        };
+        v.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve(undefined);
+        };
+      } catch {
+        resolve(undefined);
+      }
+    });
+
+  const addFiles = async (files: FileList | File[] | null) => {
+    if (!files) return;
+    const arr = Array.from(files as any as File[]).slice(0, 10);
+    if (!arr.length) return;
+    const fresh: Att[] = [];
+    for (const f of arr) {
+      if (f.size > 20 * 1024 * 1024) {
+        toast.error(`${f.name} is over 20MB`);
+        continue;
+      }
+      const mime = f.type || "";
+      const att: Att = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: f.name,
+        mime,
+        size: f.size,
+        isImage: mime.startsWith("image/"),
+        isPdf: mime.includes("pdf"),
+        isVideo: mime.startsWith("video/"),
+        status: "uploading",
+        progress: 0,
+        _file: f,
+      };
+      if (att.isImage) {
+        att.thumbnail = URL.createObjectURL(f);
+      }
+      fresh.push(att);
+    }
+    if (!fresh.length) return;
+    setAttachments((p) => [...p, ...fresh]);
+    // Kick off uploads + video thumbs in parallel
+    for (const att of fresh) {
+      if (att.isVideo) {
+        makeVideoThumb(att._file!).then((thumb) => {
+          if (thumb) patchAtt(att.id, { thumbnail: thumb });
+        });
+      }
+      uploadOne(att);
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const retryAtt = (id: string) => {
+    const a = attachments.find((x) => x.id === id);
+    if (a) uploadOne({ ...a, progress: 0, status: "uploading" });
+  };
+
+  // Window-level drag and drop
+  useEffect(() => {
+    let depth = 0;
+    const onEnter = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      depth++;
+      setDragOver(true);
+    };
+    const onLeave = () => {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragOver(false);
+    };
+    const onOver = (e: DragEvent) => {
+      if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer?.files?.length) return;
+      e.preventDefault();
+      depth = 0;
+      setDragOver(false);
+      addFiles(e.dataTransfer.files);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [attachments.length]);
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    const files = e.clipboardData?.files;
+    if (files && files.length) addFiles(files);
   };
 
   const submit = async () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || status === "submitted" || status === "streaming")
+    const ready = attachments.filter((a) => a.status === "ready" && a.url);
+    if ((!text && ready.length === 0) || status === "submitted" || status === "streaming")
       return;
+    if (attachments.some((a) => a.status === "uploading")) {
+      toast.error("Wait for uploads to finish");
+      return;
+    }
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const atts = attachments.map((a) => ({
+    const atts = ready.map((a) => ({
       ...a,
-      url: a.url.startsWith("http") ? a.url : `${origin}${a.url}`,
+      url: a.url!.startsWith("http") ? a.url! : `${origin}${a.url}`,
     }));
     const attLines = atts.length
       ? "\n\n📎 Attached files (use run_code with `requests` to download/inspect, or web_fetch for text URLs):\n" +
@@ -233,11 +401,7 @@ function ChatWindow({
       : "";
     const parts: any[] = [{ type: "text", text: (text || "(see attached files)") + attLines }];
     for (const a of atts) {
-      if (a.isImage) {
-        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
-      } else {
-        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
-      }
+      parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
     }
     setInput("");
     setAttachments([]);
