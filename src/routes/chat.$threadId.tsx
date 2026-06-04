@@ -822,7 +822,142 @@ function ChatWindow({
   );
 }
 
+function FilesPane({ files }: { files: ThreadFile[] }) {
+  if (!files.length) {
+    return (
+      <div className="max-w-[760px] mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
+        No files yet. Attach a file or ask the team to generate one.
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-[760px] mx-auto px-6 py-5">
+      <div className="grid sm:grid-cols-2 gap-2">
+        {files.map((f, i) => {
+          const isImage = f.isImage;
+          const isPdf = f.isPdf;
+          const isCode = /\.(json|js|ts|tsx|py|html|css)$/i.test(f.name);
+          return (
+            <a
+              key={i}
+              href={f.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent/40 transition-colors"
+            >
+              {isImage && f.url ? (
+                <img
+                  src={f.url}
+                  alt={f.name}
+                  className="w-10 h-10 rounded-lg object-cover border"
+                />
+              ) : (
+                <div
+                  className={
+                    "w-10 h-10 rounded-lg flex items-center justify-center " +
+                    (isPdf
+                      ? "bg-rose-100 text-rose-700"
+                      : isCode
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-primary/10 text-primary")
+                  }
+                >
+                  {isPdf ? (
+                    <FileText className="w-5 h-5" />
+                  ) : isCode ? (
+                    <FileCode2 className="w-5 h-5" />
+                  ) : (
+                    <FileIcon className="w-5 h-5" />
+                  )}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium truncate">{f.name}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {[(f.mime ?? "").split("/").pop()?.toUpperCase(), bytesLabel(f.size)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
+              <Download className="w-4 h-4 text-muted-foreground" />
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TasksPane({ tasks }: { tasks: ThreadTask[] }) {
+  if (!tasks.length) {
+    return (
+      <div className="max-w-[760px] mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
+        No tasks yet. Ask the team to research, draft, generate or post — tasks will show up here.
+      </div>
+    );
+  }
+  const dotFor = (s: ThreadTask["status"]) =>
+    s === "running"
+      ? "bg-amber-500 animate-pulse"
+      : s === "done"
+        ? "bg-emerald-500"
+        : s === "queued"
+          ? "bg-amber-400"
+          : s === "blocked"
+            ? "bg-rose-500"
+            : "bg-rose-600";
+  const labelFor = (s: ThreadTask["status"]) =>
+    s === "running"
+      ? "Working"
+      : s === "done"
+        ? "Done"
+        : s === "queued"
+          ? "Queued"
+          : s === "blocked"
+            ? "Blocked"
+            : "Error";
+  return (
+    <div className="max-w-[760px] mx-auto px-6 py-5">
+      <ul className="divide-y border rounded-xl bg-background overflow-hidden">
+        {tasks.map((t) => {
+          const sub = t.agentId ? getAgent(t.agentId) : undefined;
+          return (
+            <li key={t.id} className="flex items-center gap-3 px-3 py-2.5">
+              {sub ? (
+                <img src={sub.image} alt={sub.name} className="w-7 h-7 rounded-full object-cover" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Wrench className="w-3.5 h-3.5" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium truncate">{t.label}</div>
+                {t.detail && (
+                  <div className="text-[11px] text-muted-foreground truncate">{t.detail}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
+                <span className={cn("w-1.5 h-1.5 rounded-full", dotFor(t.status))} />
+                {labelFor(t.status)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function NotesPane() {
+  return (
+    <div className="max-w-[760px] mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
+      Notes coming soon. Pin key takeaways from this conversation here.
+    </div>
+  );
+}
+
 function EmptyState({ onPick }: { onPick: (t: string) => void }) {
+
   const suggestions = [
     "Draft a friendly cold outreach email to a SaaS founder",
     "Summarize the latest unread emails in my inbox",
