@@ -446,6 +446,8 @@ function ChatWindow({
         )
     : conns.filter((c) => c.status === "ACTIVE");
 
+  const [tab, setTab] = useState<TabKey>("chat");
+
   const threadTitle = useMemo(() => {
     const first = messages.find((m) => m.role === "user");
     if (!first) return "New Conversation";
@@ -456,6 +458,103 @@ function ChatWindow({
     return txt ? txt.slice(0, 72) : "New Conversation";
   }, [messages]);
   void allowedSlugs;
+
+  // Derive Files + Tasks + Employee activity from messages
+  const { files, tasks, working, active, progress } = useMemo(() => {
+    const files: ThreadFile[] = [];
+    const tasks: ThreadTask[] = [];
+    const working = new Set<string>();
+    const active = new Set<string>();
+    let totalTools = 0;
+    let doneTools = 0;
+    for (const m of messages) {
+      for (const p of m.parts as any[]) {
+        // user-attached files
+        if (p.type === "file" && typeof p.url === "string") {
+          files.push({
+            name: p.filename ?? "file",
+            mime: p.mediaType,
+            url: p.url,
+            isImage: (p.mediaType ?? "").startsWith("image/"),
+            isPdf: (p.mediaType ?? "").includes("pdf"),
+          });
+        }
+        // assistant tool calls
+        if (typeof p.type === "string" && p.type.startsWith("tool-")) {
+          totalTools++;
+          const name = p.type.replace(/^tool-/, "");
+          const state = p.state ?? "input-streaming";
+          const queued = p.output?.status === "queued";
+          const blocked = p.output?.status === "blocked" || p.output?.blocker;
+          const isDone = state === "output-available";
+          const isErr = state === "output-error";
+          const tStatus: ThreadTask["status"] = isErr
+            ? "error"
+            : blocked
+              ? "blocked"
+              : queued
+                ? "queued"
+                : isDone
+                  ? "done"
+                  : "running";
+          if (isDone || isErr) doneTools++;
+          // delegation → record agent activity
+          if (name === "delegate_to_employee") {
+            const employeeId: string | undefined =
+              p.output?.employee_id ?? p.input?.employee;
+            if (employeeId) {
+              if (tStatus === "running") working.add(employeeId);
+              else active.add(employeeId);
+            }
+            const sub = employeeId ? getAgent(employeeId) : undefined;
+            tasks.push({
+              id: `${m.id}-${name}-${tasks.length}`,
+              label: `Delegated to ${sub?.name ?? employeeId ?? "teammate"}`,
+              detail: p.input?.task,
+              agentId: employeeId,
+              status: tStatus,
+            });
+          } else {
+            const f = friendlyToolLabel(name);
+            tasks.push({
+              id: `${m.id}-${name}-${tasks.length}`,
+              label: f.label,
+              detail: name,
+              status: tStatus,
+            });
+          }
+          // collect artifacts from tool outputs
+          const arts: any[] = Array.isArray(p.output?.artifacts) ? p.output.artifacts : [];
+          for (const a of arts) {
+            files.push({
+              name: a.name ?? "file",
+              mime: a.mime,
+              size: a.size,
+              url: a.url,
+              isImage: a.isImage || (a.mime ?? "").startsWith("image/"),
+              isPdf: a.isPdf || (a.mime ?? "").includes("pdf"),
+            });
+          }
+        }
+      }
+    }
+    const progress = totalTools === 0 ? (messages.length ? 100 : 0) : Math.round((doneTools / totalTools) * 100);
+    return { files, tasks, working, active, progress };
+  }, [messages]);
+
+  const { setActivity } = useChatActivity();
+  useEffect(() => {
+    setActivity({
+      threadTitle,
+      files,
+      tasks,
+      working,
+      active,
+      progress,
+      running: busy,
+    });
+  }, [threadTitle, files, tasks, working, active, progress, busy, setActivity]);
+
 
   return (
     <>
