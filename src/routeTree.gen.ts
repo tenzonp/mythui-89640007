@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SolutionsRouteImport } from './routes/solutions'
 import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -35,6 +36,11 @@ const SolutionsRoute = SolutionsRouteImport.update({
 const ResourcesRoute = ResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
+  '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
+  '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/integrations': typeof IntegrationsRoute
   '/pricing': typeof PricingRoute
+  '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/solutions': typeof SolutionsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/integrations'
     | '/pricing'
+    | '/profile'
     | '/resources'
     | '/solutions'
     | '/ai-employees/$agentId'
@@ -200,6 +210,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/integrations'
     | '/pricing'
+    | '/profile'
     | '/resources'
     | '/solutions'
     | '/ai-employees/$agentId'
@@ -219,6 +230,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/integrations'
     | '/pricing'
+    | '/profile'
     | '/resources'
     | '/solutions'
     | '/ai-employees/$agentId'
@@ -239,6 +251,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   IntegrationsRoute: typeof IntegrationsRoute
   PricingRoute: typeof PricingRoute
+  ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
   SolutionsRoute: typeof SolutionsRoute
   AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
@@ -262,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/resources'
       fullPath: '/resources'
       preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -393,6 +413,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   IntegrationsRoute: IntegrationsRoute,
   PricingRoute: PricingRoute,
+  ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,
   SolutionsRoute: SolutionsRoute,
   AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,

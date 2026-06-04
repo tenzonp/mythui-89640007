@@ -282,6 +282,7 @@ export type Database = {
     }
     Functions: {
       get_credit_balance: { Args: { uid: string }; Returns: number }
+      grant_daily_free_credits: { Args: never; Returns: undefined }
     }
     Enums: {
       plan_tier: "free" | "pro" | "everest"
