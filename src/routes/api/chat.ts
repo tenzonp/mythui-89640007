@@ -518,6 +518,96 @@ function detectInstagramWindowClosed(result: any): boolean {
   }
 }
 
+function guessMimeFromName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.endsWith(".png")) return "image/png";
+  if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+  if (n.endsWith(".webp")) return "image/webp";
+  if (n.endsWith(".gif")) return "image/gif";
+  if (n.endsWith(".pdf")) return "application/pdf";
+  return "application/octet-stream";
+}
+
+function storagePathFromFileUrl(value: string): string | null {
+  try {
+    const u = new URL(value, "https://app.local");
+    const marker = "/api/files/";
+    const idx = u.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(u.pathname.slice(idx + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+async function readFileReference(value: any) {
+  const raw =
+    typeof value === "string" ? value : value?.url || value?.href || value?.s3key || value?.path || "";
+  if (!raw || typeof raw !== "string") return null;
+  const name = String(value?.name || value?.filename || raw.split("/").pop() || "attachment").replace(
+    /[^a-zA-Z0-9._-]/g,
+    "_",
+  );
+  const explicitMime = value?.mimetype || value?.mime || value?.mediaType;
+  const storagePath = storagePathFromFileUrl(raw) || (raw.includes("/") && !/^https?:/i.test(raw) ? raw : null);
+  if (storagePath) {
+    const { data, error } = await supabaseAdmin.storage.from("artifacts").download(storagePath);
+    if (error || !data) return null;
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    return { bytes, name, mimetype: explicitMime || data.type || guessMimeFromName(name) };
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    const res = await fetch(raw);
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { bytes, name, mimetype: explicitMime || res.headers.get("content-type") || guessMimeFromName(name) };
+  }
+  return null;
+}
+
+function findStoredImageUrlInHtml(args: any): string | null {
+  const body = String(args?.body || args?.message_body || "");
+  const match = body.match(/<img[^>]+src=["']([^"']*\/api\/files\/[^"']+)["'][^>]*>/i);
+  return match?.[1] ?? null;
+}
+
+async function prepareComposioArgs(t: ComposioTool, args: any) {
+  const toolkit = (t.toolkit?.slug ?? "").toLowerCase();
+  if (toolkit !== "gmail") return args ?? {};
+  const next = { ...(args ?? {}) };
+  const attachmentSource = next.attachment ?? findStoredImageUrlInHtml(next);
+  if (!attachmentSource) return next;
+  if (
+    typeof attachmentSource === "object" &&
+    attachmentSource?.s3key?.startsWith?.("projects/") &&
+    attachmentSource?.name &&
+    attachmentSource?.mimetype
+  ) {
+    return next;
+  }
+  const file = await readFileReference(attachmentSource);
+  if (!file) return next;
+  if (file.bytes.byteLength > 24 * 1024 * 1024) {
+    throw new Error("Attachment is too large for Gmail (max ~24MB before encoding).");
+  }
+  next.attachment = await stageFileBufferForTool({
+    bytes: file.bytes,
+    filename: file.name,
+    mimetype: file.mimetype,
+    toolSlug: t.slug,
+    toolkitSlug: t.toolkit?.slug ?? "gmail",
+  });
+  for (const key of ["body", "message_body"]) {
+    if (typeof next[key] === "string") {
+      next[key] = next[key].replace(
+        /<img[^>]+src=["'][^"']*\/api\/files\/[^"']+["'][^>]*>/gi,
+        `<p><strong>AI image attached:</strong> ${next.attachment.name}</p>`,
+      );
+    }
+  }
+  return next;
+}
+
 function buildAgentSystem(agent: Agent, allowedSlugs: string[], roster: string) {
   const missingForRole = agent.toolkits.filter(
     (t) => !allowedSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
