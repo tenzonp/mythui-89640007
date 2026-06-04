@@ -170,11 +170,55 @@ function ChatWindow({
     if (status === "ready") onRefreshPendingInstagram();
   }, [status]);
 
+  const onPickFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const next = [...attachments];
+      for (const f of Array.from(files).slice(0, 6)) {
+        if (f.size > 20 * 1024 * 1024) {
+          toast.error(`${f.name} is over 20MB`);
+          continue;
+        }
+        const buf = await f.arrayBuffer();
+        let bin = "";
+        const u8 = new Uint8Array(buf);
+        for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
+        const dataBase64 = btoa(bin);
+        try {
+          const r = await fnUpload({
+            data: { name: f.name, dataBase64, mime: f.type || undefined },
+          });
+          next.push(r);
+        } catch (e: any) {
+          toast.error(e?.message ?? "Upload failed");
+        }
+      }
+      setAttachments(next);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   const submit = async () => {
     const text = input.trim();
-    if (!text || status === "submitted" || status === "streaming") return;
+    if ((!text && attachments.length === 0) || status === "submitted" || status === "streaming")
+      return;
+    const atts = attachments;
+    const attLines = atts.length
+      ? "\n\n📎 Attached files (use run_code with `requests` to download/inspect, or web_fetch for text URLs):\n" +
+        atts.map((a) => `- ${a.name} (${a.mime}) — ${a.url}`).join("\n")
+      : "";
+    const parts: any[] = [{ type: "text", text: (text || "(see attached files)") + attLines }];
+    for (const a of atts) {
+      if (a.isImage) {
+        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
+      }
+    }
     setInput("");
-    await sendMessage({ text });
+    setAttachments([]);
+    await sendMessage({ parts });
   };
 
   const busy = status === "submitted" || status === "streaming";
