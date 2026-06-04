@@ -394,18 +394,17 @@ function ChipPicker({ kicker, label, options, value, onChange, onBack, onNext, m
         {options.map((o: string) => {
           const on = selected.includes(o);
           return (
-            <motion.button
+            <button
               key={o}
-              whileTap={{ scale: 0.95 }}
               onClick={() => toggle(o)}
-              className={`px-4 py-2.5 rounded-full text-sm border transition-all ${
+              className={`px-4 py-2.5 rounded-full text-sm border transition-all active:scale-95 ${
                 on
                   ? "bg-gradient-to-r from-violet-500 to-fuchsia-500 border-transparent text-white shadow-[0_0_25px_-5px_rgba(168,85,247,0.7)]"
                   : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >
               {o}
-            </motion.button>
+            </button>
           );
         })}
       </div>
@@ -460,8 +459,8 @@ function TeamStage({ team, onChanged, onBack, onNext }: any) {
       {team.length > 0 && (
         <div className="mt-4 grid gap-2">
           {team.map((t: any) => (
-            <motion.div key={t.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+            <div key={t.id}
+              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10 animate-in fade-in-0 slide-in-from-left-2 duration-300">
               <div className="text-sm">
                 <div className="font-medium text-white">{t.name} <span className="text-white/40 font-normal">· {t.role}</span></div>
                 <div className="text-xs text-white/40">{[t.email, t.phone].filter(Boolean).join(" · ")}</div>
@@ -469,7 +468,7 @@ function TeamStage({ team, onChanged, onBack, onNext }: any) {
               <button onClick={async () => { await delFn({ data: { id: t.id } }); onChanged(); }} className="text-white/40 hover:text-rose-400">
                 <Trash2 className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
@@ -517,8 +516,8 @@ function AccountsStage({ accounts, onChanged, onBack, onNext }: any) {
       {accounts.length > 0 && (
         <div className="mt-4 grid gap-2">
           {accounts.map((x: any) => (
-            <motion.div key={x.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+            <div key={x.id}
+              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10 animate-in fade-in-0 slide-in-from-left-2 duration-300">
               <div className="text-sm">
                 <div className="font-mono text-[10px] uppercase tracking-widest text-fuchsia-300/80">{x.kind}</div>
                 <div className="text-white">{[x.handle, x.url].filter(Boolean).join(" · ")}</div>
@@ -526,7 +525,7 @@ function AccountsStage({ accounts, onChanged, onBack, onNext }: any) {
               <button onClick={async () => { await delFn({ data: { id: x.id } }); onChanged(); }} className="text-white/40 hover:text-rose-400">
                 <Trash2 className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
