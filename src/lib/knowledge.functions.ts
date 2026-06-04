@@ -2,6 +2,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export const inferProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        name: z.string().max(200).optional(),
+        description: z.string().min(1).max(4000),
+        extra: z.string().max(4000).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { inferProfileFields } = await import("./profile-infer.server");
+    return await inferProfileFields(data);
+  });
+
 export const getKnowledge = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
