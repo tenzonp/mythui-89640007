@@ -613,11 +613,44 @@ function ToolCall({ part }: { part: any }) {
   return <GenericToolCall part={part} name={name} />;
 }
 
+function ArtifactCard({ a }: { a: any }) {
+  const isImage = (a.mime ?? "").startsWith("image/");
+  const isPdf = (a.mime ?? "").includes("pdf");
+  const sizeKb = a.size ? `${(a.size / 1024).toFixed(1)} KB` : "";
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noreferrer"
+      download={a.name}
+      className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent transition-colors group/card"
+    >
+      <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        {isImage ? (
+          <ImageIcon className="w-5 h-5" />
+        ) : isPdf ? (
+          <FileText className="w-5 h-5" />
+        ) : (
+          <FileIcon className="w-5 h-5" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate">{a.name}</div>
+        <div className="text-[11px] text-muted-foreground">
+          {a.mime} {sizeKb && `· ${sizeKb}`}
+        </div>
+      </div>
+      <Download className="w-4 h-4 text-muted-foreground group-hover/card:text-foreground" />
+    </a>
+  );
+}
+
 function GenericToolCall({ part, name }: { part: any; name: string }) {
   const [open, setOpen] = useState(false);
   const state = part.state ?? "input-streaming";
   const queued = part.output?.status === "queued";
   const blocked = part.output?.status === "blocked" || part.output?.blocker;
+  const artifacts: any[] = Array.isArray(part.output?.artifacts) ? part.output.artifacts : [];
   const statusLabel = queued
     ? "Queued"
     : blocked
@@ -628,36 +661,50 @@ function GenericToolCall({ part, name }: { part: any; name: string }) {
           ? "Error"
           : "Running…";
   return (
-    <div className="border rounded-xl bg-muted/30">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs"
-      >
-        <span className="flex items-center gap-2">
-          <Wrench className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="font-mono">{name}</span>
-          <span className="text-muted-foreground">· {statusLabel}</span>
-        </span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="px-3 pb-3 text-xs space-y-2">
-          {part.input && (
-            <pre className="bg-background rounded p-2 overflow-auto max-h-48">
-              {JSON.stringify(part.input, null, 2)}
-            </pre>
-          )}
-          {part.output &&
-            (part.output?.message ? (
-              <div className="bg-background rounded p-2 text-muted-foreground">
-                {String(part.output.message)}
-              </div>
-            ) : (
-              <pre className="bg-background rounded p-2 overflow-auto max-h-64">
-                {JSON.stringify(part.output, null, 2)}
+    <div className="space-y-2">
+      <div className="border rounded-xl bg-muted/30">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 text-xs"
+        >
+          <span className="flex items-center gap-2">
+            <Wrench className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="font-mono">{name}</span>
+            <span className="text-muted-foreground">· {statusLabel}</span>
+            {artifacts.length > 0 && (
+              <span className="text-muted-foreground">
+                · {artifacts.length} file{artifacts.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </span>
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <div className="px-3 pb-3 text-xs space-y-2">
+            {part.input && (
+              <pre className="bg-background rounded p-2 overflow-auto max-h-48">
+                {JSON.stringify(part.input, null, 2)}
               </pre>
-            ))}
+            )}
+            {part.output &&
+              (part.output?.message ? (
+                <div className="bg-background rounded p-2 text-muted-foreground">
+                  {String(part.output.message)}
+                </div>
+              ) : (
+                <pre className="bg-background rounded p-2 overflow-auto max-h-64">
+                  {JSON.stringify(part.output, null, 2)}
+                </pre>
+              ))}
+          </div>
+        )}
+      </div>
+      {artifacts.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          {artifacts.map((a, i) => (
+            <ArtifactCard key={i} a={a} />
+          ))}
         </div>
       )}
     </div>
