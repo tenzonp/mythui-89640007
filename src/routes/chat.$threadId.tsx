@@ -9,6 +9,7 @@ import {
   deleteMessage,
   listInstagramPendingReplies,
 } from "@/lib/chat.functions";
+import { uploadAttachment } from "@/lib/uploads.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowUp,
