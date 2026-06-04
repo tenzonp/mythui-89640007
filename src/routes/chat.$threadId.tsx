@@ -1463,7 +1463,93 @@ function ToolCall({ part }: { part: any }) {
   if (name === "delegate_to_employee") {
     return <DelegationCard part={part} />;
   }
+  if (name === "build_website") {
+    return <WebsiteBuildCard part={part} />;
+  }
   return <GenericToolCall part={part} name={name} />;
+}
+
+function WebsiteBuildCard({ part }: { part: any }) {
+  const state = part.state ?? "input-streaming";
+  const input = part.input ?? {};
+  const output = part.output ?? {};
+  const running = state !== "output-available" && state !== "output-error";
+  const failed = state === "output-error" || output?.error;
+  const liveUrl: string | undefined = output?.live_url;
+  const zipUrl: string | undefined = output?.zip_url;
+  const fileCount: number | undefined = output?.file_count;
+  const siteName: string | undefined = input?.name;
+
+  const statusLabel = running ? "Building & deploying…" : failed ? "Failed" : "Live";
+  const statusColor = running ? "bg-amber-500" : failed ? "bg-destructive" : "bg-emerald-500";
+
+  return (
+    <div className="border rounded-2xl overflow-hidden bg-gradient-to-br from-violet/5 via-background to-background">
+      <div className="px-4 py-3 flex items-center gap-3 border-b bg-background/60">
+        <div className="w-9 h-9 rounded-lg bg-violet/10 text-violet flex items-center justify-center">
+          <FileCode2 className="w-4 h-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate">
+            {siteName ? `Website · ${siteName}` : "Website build"}
+          </div>
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${statusColor} ${running ? "animate-pulse" : ""}`} />
+            {statusLabel}
+            {fileCount ? <span>· {fileCount} files</span> : null}
+          </div>
+        </div>
+      </div>
+      {input?.prompt && (
+        <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+          <span className="font-medium text-foreground">Brief: </span>
+          {String(input.prompt).slice(0, 220)}
+          {String(input.prompt).length > 220 ? "…" : ""}
+        </div>
+      )}
+      {failed && (
+        <div className="px-4 py-3 text-xs text-destructive">
+          {String(output?.error ?? "Build failed")}
+        </div>
+      )}
+      {!running && !failed && (
+        <div className="px-4 py-3 grid sm:grid-cols-2 gap-2">
+          {liveUrl && (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2.5 hover:bg-accent/50 transition"
+            >
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Live URL</div>
+                <div className="text-sm font-medium truncate">{liveUrl.replace(/^https?:\/\//, "")}</div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </a>
+          )}
+          {zipUrl && (
+            <a
+              href={`${zipUrl}${zipUrl.includes("?") ? "&" : "?"}download=1`}
+              className="flex items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2.5 hover:bg-accent/50 transition"
+            >
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Source ZIP</div>
+                <div className="text-sm font-medium truncate">Download project</div>
+              </div>
+              <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+            </a>
+          )}
+        </div>
+      )}
+      {running && (
+        <div className="px-4 py-4 text-xs text-muted-foreground flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Generating pages, packaging ZIP and deploying to Vercel…
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ArtifactCard({ a }: { a: any }) {

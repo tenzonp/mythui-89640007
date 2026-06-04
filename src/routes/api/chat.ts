@@ -1113,7 +1113,12 @@ export const Route = createFileRoute("/api/chat")({
           });
         }
 
-        const system = buildAgentSystem(agent, allowedSlugs, roster);
+        const baseSystem = buildAgentSystem(agent, allowedSlugs, roster);
+        const knowledgeBlock = knowledgeContext
+          ? `\n\n=== USER BUSINESS KNOWLEDGE BASE ===\nThis is ground truth about the user's business. Treat it as already known — do NOT ask the user to repeat anything in here. When asked to do work (write copy, build a site, send a campaign, post to social, email someone…), pull names, tone, audience, team, accounts, and facts directly from this block.\n\n${knowledgeContext}\n=== END KNOWLEDGE BASE ===`
+          : `\n\n=== USER BUSINESS KNOWLEDGE BASE ===\n(empty — the user has not completed onboarding yet)\n=== END KNOWLEDGE BASE ===`;
+        const gapPolicy = `\n\nKNOWLEDGE-GAP POLICY (MANDATORY):\nBefore generating any non-trivial output (website, email, ad, post, campaign, strategy, document), check the knowledge base above + call lookup_knowledge if useful. If critical facts are missing (business name, what they actually sell, audience, brand tone, key URLs, contact info, team owner for the task), STOP and ask the user 2–5 short, numbered, targeted questions to fill those specific gaps first. Don't ask things already answered in the knowledge base. After the user answers, call record_knowledge to save the new durable facts, then proceed with the work. Never invent business facts.`;
+        const system = baseSystem + knowledgeBlock + gapPolicy;
         // Auto-pick the right DeepSeek model based on the latest user turn,
         // tool surface area, and whether the agent can delegate.
         const lastUserText = (() => {
