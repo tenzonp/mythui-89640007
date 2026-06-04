@@ -150,7 +150,15 @@ function ChatWindow({
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<
-    { name: string; url: string; mime: string; size: number; isImage: boolean }[]
+    {
+      name: string;
+      url: string;
+      mime: string;
+      size: number;
+      isImage: boolean;
+      isPdf?: boolean;
+      pageCount?: number;
+    }[]
   >([]);
   const [uploading, setUploading] = useState(false);
   const fnUpload = useServerFn(uploadAttachment);
