@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Trash2, Plus, Pencil, Check, X, ArrowRight } from "lucide-react";
+import { Trash2, Plus, Check, X, ArrowRight } from "lucide-react";
 import {
   getKnowledge,
   upsertBusinessProfile,
