@@ -195,7 +195,7 @@ function ChatWindow({
           return fetch(input, { ...init, headers });
         },
         prepareSendMessagesRequest: ({ messages, id }) => ({
-          body: { messages, threadId: id, agentId: agentRef.current },
+          body: { messages, threadId: id, agentId: agentRef.current, modelId: modelRef.current },
         }),
       }),
     [],
