@@ -466,6 +466,11 @@ function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
       ...schema.properties.attachment,
       anyOf: [
         { type: "string", description: "Artifact URL, /api/files URL, or public URL to attach." },
+        {
+          type: "array",
+          items: { type: "string" },
+          description: "Multiple artifact URLs, /api/files URLs, or public URLs to attach.",
+        },
         schema.properties.attachment,
       ],
     };
