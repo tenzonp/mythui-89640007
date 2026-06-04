@@ -142,7 +142,7 @@ function OnboardingPage() {
                 label="What's your business called?"
                 hint="The name Wynsa will use everywhere."
                 value={profile.name ?? ""}
-                onChange={(v) => setProfile({ ...profile, name: v })}
+                onChange={(v: string) => setProfile({ ...profile, name: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ name: profile.name }); next(); }}
                 canNext={(profile.name ?? "").trim().length > 1}
@@ -156,7 +156,7 @@ function OnboardingPage() {
                 label="Drop your tagline."
                 hint="One punchy line. Skip if you don't have one."
                 value={profile.tagline ?? ""}
-                onChange={(v) => setProfile({ ...profile, tagline: v })}
+                onChange={(v: string) => setProfile({ ...profile, tagline: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ tagline: profile.tagline }); next(); }}
                 optional
@@ -170,7 +170,7 @@ function OnboardingPage() {
                 label="Tell Wynsa what you actually do."
                 hint="Products, services, business model, who pays you. Spill it."
                 value={profile.description ?? ""}
-                onChange={(v) => setProfile({ ...profile, description: v })}
+                onChange={(v: string) => setProfile({ ...profile, description: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ description: profile.description }); next(); }}
                 canNext={(profile.description ?? "").trim().length > 10}
@@ -185,7 +185,7 @@ function OnboardingPage() {
                 label="Pick your world."
                 options={INDUSTRIES}
                 value={profile.industry ?? ""}
-                onChange={(v) => setProfile({ ...profile, industry: v })}
+                onChange={(v: string) => setProfile({ ...profile, industry: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ industry: profile.industry }); next(); }}
                 allowCustom
@@ -198,7 +198,7 @@ function OnboardingPage() {
                 label="Got a website?"
                 hint="If yes, paste the URL. If not, smash next — Wynsa can build you one."
                 value={profile.website ?? ""}
-                onChange={(v) => setProfile({ ...profile, website: v })}
+                onChange={(v: string) => setProfile({ ...profile, website: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ website: profile.website }); next(); }}
                 optional
@@ -212,7 +212,7 @@ function OnboardingPage() {
                 label="Who are you for?"
                 hint="Describe your customer like you'd describe a friend."
                 value={profile.target_audience ?? ""}
-                onChange={(v) => setProfile({ ...profile, target_audience: v })}
+                onChange={(v: string) => setProfile({ ...profile, target_audience: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ target_audience: profile.target_audience }); next(); }}
                 multiline
@@ -227,7 +227,7 @@ function OnboardingPage() {
                 label="What's your #1 goal right now?"
                 hint="Wynsa optimizes everything for this."
                 value={profile.primary_goal ?? ""}
-                onChange={(v) => setProfile({ ...profile, primary_goal: v })}
+                onChange={(v: string) => setProfile({ ...profile, primary_goal: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ primary_goal: profile.primary_goal }); next(); }}
                 multiline
@@ -242,7 +242,7 @@ function OnboardingPage() {
                 label="Pick your brand vibe."
                 options={TONES}
                 value={profile.tone ?? ""}
-                onChange={(v) => setProfile({ ...profile, tone: v })}
+                onChange={(v: string) => setProfile({ ...profile, tone: v })}
                 onBack={prev}
                 onNext={async () => { await persistProfile({ tone: profile.tone }); next(); }}
                 multi
@@ -454,12 +454,12 @@ function TeamStage({ team, onChanged, onBack, onNext }: any) {
 
       <div className="mt-6 grid gap-2 p-4 rounded-2xl border border-white/10 bg-white/[0.04]">
         <div className="grid grid-cols-2 gap-2">
-          <FieldInput placeholder="Name" value={m.name} onChange={(v) => setM({ ...m, name: v })} />
-          <FieldInput placeholder="Role" value={m.role} onChange={(v) => setM({ ...m, role: v })} />
-          <FieldInput placeholder="Email" value={m.email} onChange={(v) => setM({ ...m, email: v })} />
-          <FieldInput placeholder="Phone" value={m.phone} onChange={(v) => setM({ ...m, phone: v })} />
+          <FieldInput placeholder="Name" value={m.name} onChange={(v: string) => setM({ ...m, name: v })} />
+          <FieldInput placeholder="Role" value={m.role} onChange={(v: string) => setM({ ...m, role: v })} />
+          <FieldInput placeholder="Email" value={m.email} onChange={(v: string) => setM({ ...m, email: v })} />
+          <FieldInput placeholder="Phone" value={m.phone} onChange={(v: string) => setM({ ...m, phone: v })} />
         </div>
-        <FieldInput placeholder="Notes (owns marketing, handles support…)" value={m.notes} onChange={(v) => setM({ ...m, notes: v })} />
+        <FieldInput placeholder="Notes (owns marketing, handles support…)" value={m.notes} onChange={(v: string) => setM({ ...m, notes: v })} />
         <div className="flex justify-end">
           <Button size="sm" onClick={() => add.mutate()} disabled={!m.name || add.isPending}
             className="bg-violet-500/20 hover:bg-violet-500/30 text-violet-200 border border-violet-500/30 rounded-lg">
@@ -514,9 +514,9 @@ function AccountsStage({ accounts, onChanged, onBack, onNext }: any) {
             </button>
           ))}
         </div>
-        <FieldInput placeholder="Handle (@yourbiz, phone, address…)" value={a.handle} onChange={(v) => setA({ ...a, handle: v })} />
-        <FieldInput placeholder="URL (optional)" value={a.url} onChange={(v) => setA({ ...a, url: v })} />
-        <FieldInput placeholder="Notes" value={a.notes} onChange={(v) => setA({ ...a, notes: v })} />
+        <FieldInput placeholder="Handle (@yourbiz, phone, address…)" value={a.handle} onChange={(v: string) => setA({ ...a, handle: v })} />
+        <FieldInput placeholder="URL (optional)" value={a.url} onChange={(v: string) => setA({ ...a, url: v })} />
+        <FieldInput placeholder="Notes" value={a.notes} onChange={(v: string) => setA({ ...a, notes: v })} />
         <div className="flex justify-end">
           <Button size="sm" onClick={() => add.mutate()} disabled={!a.handle || add.isPending}
             className="bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-200 border border-fuchsia-500/30 rounded-lg">
@@ -561,11 +561,11 @@ function FactsStage({ entries, onChanged, onBack, onFinish }: any) {
       <p className="mt-3 text-white/50 text-sm">Pricing, refund policy, FAQs, brand story, killer facts. Add as many as you want.</p>
 
       <div className="mt-6 grid gap-2 p-4 rounded-2xl border border-white/10 bg-white/[0.04]">
-        <FieldInput placeholder="Title (e.g. Pricing, Refund policy)" value={e.title} onChange={(v) => setE({ ...e, title: v })} />
+        <FieldInput placeholder="Title (e.g. Pricing, Refund policy)" value={e.title} onChange={(v: string) => setE({ ...e, title: v })} />
         <Textarea rows={4} value={e.body ?? ""} onChange={(ev) => setE({ ...e, body: ev.target.value })}
           placeholder="The facts…"
           className="bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl" />
-        <FieldInput placeholder="Tags, comma separated" value={e.tags} onChange={(v) => setE({ ...e, tags: v })} />
+        <FieldInput placeholder="Tags, comma separated" value={e.tags} onChange={(v: string) => setE({ ...e, tags: v })} />
         <div className="flex justify-end">
           <Button size="sm" onClick={() => add.mutate()} disabled={!e.title || !e.body || add.isPending}
             className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 rounded-lg">
