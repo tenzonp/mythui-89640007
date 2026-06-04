@@ -420,3 +420,69 @@ function CreditsCard() {
     </div>
   );
 }
+
+function modelLabel(id?: string | null) {
+  if (!id) return "—";
+  const m = WYNSA_MODELS.find((x) => x.backendModel === id || x.id === id);
+  return m?.name ?? id;
+}
+
+function UsageBreakdown() {
+  const fetchLedger = useServerFn(getMyLedger);
+  const [entries, setEntries] = useState<any[]>([]);
+  useEffect(() => {
+    fetchLedger().then((r) => setEntries(r.entries)).catch(() => {});
+    const t = setInterval(() => {
+      fetchLedger().then((r) => setEntries(r.entries)).catch(() => {});
+    }, 15000);
+    return () => clearInterval(t);
+  }, []);
+  const spends = entries.filter((e) => e.kind === "spend").slice(0, 8);
+  const todaySpend = entries
+    .filter(
+      (e) =>
+        e.kind === "spend" &&
+        new Date(e.created_at).toDateString() === new Date().toDateString(),
+    )
+    .reduce((s, e) => s + Math.abs(e.amount), 0);
+  return (
+    <div className="bg-white rounded-xl border p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[13px] font-semibold">Usage breakdown</div>
+        <span className="text-[10.5px] text-muted-foreground">
+          {todaySpend} today
+        </span>
+      </div>
+      {spends.length === 0 ? (
+        <div className="text-[11px] text-muted-foreground py-1.5">
+          No turns spent yet.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {spends.map((e) => (
+            <div key={e.id} className="flex items-center gap-2 text-[11.5px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="truncate font-medium">{modelLabel(e.model)}</div>
+                <div className="text-[10px] text-muted-foreground truncate capitalize">
+                  {e.complexity ?? "turn"} ·{" "}
+                  {new Date(e.created_at).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </div>
+              </div>
+              <span className="tabular-nums text-foreground">{e.amount}</span>
+            </div>
+          ))}
+          <Link
+            to="/profile"
+            className="block text-center text-[11px] py-1 mt-1 text-violet hover:underline"
+          >
+            View all activity
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
