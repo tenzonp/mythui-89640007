@@ -150,9 +150,11 @@ export async function stageFileBufferForTool(args: {
   toolSlug: string;
   toolkitSlug: string;
 }): Promise<FileUploadable> {
-  const fileBuffer = Buffer.from(
-    args.bytes.buffer.slice(args.bytes.byteOffset, args.bytes.byteOffset + args.bytes.byteLength),
-  );
+  const fileArrayBuffer = args.bytes.buffer.slice(
+    args.bytes.byteOffset,
+    args.bytes.byteOffset + args.bytes.byteLength,
+  ) as ArrayBuffer;
+  const fileBuffer = Buffer.from(fileArrayBuffer);
   const md5 = createHash("md5").update(fileBuffer).digest("hex");
   const upload = await call<{
     key: string;
@@ -175,7 +177,7 @@ export async function stageFileBufferForTool(args: {
   if (upload.metadata?.storage_backend === "azure_blob_storage") {
     headers["x-ms-blob-type"] = "BlockBlob";
   }
-  const uploadBody = new Blob([fileBuffer], { type: args.mimetype });
+  const uploadBody = new Blob([fileArrayBuffer], { type: args.mimetype });
   const res = await fetch(uploadUrl, { method: "PUT", headers, body: uploadBody });
   if (!res.ok) throw new Error(`Composio file upload failed (${res.status})`);
   return { name: args.filename, mimetype: args.mimetype, s3key: upload.key };
