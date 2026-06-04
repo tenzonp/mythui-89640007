@@ -87,6 +87,8 @@ export async function runCode(opts: {
   code: string;
   language?: "python" | "javascript";
   timeoutMs?: number;
+  employeeId?: string;
+  employeeName?: string;
 }): Promise<RunCodeResult> {
   const apiKey = process.env.E2B_API_KEY;
   if (!apiKey) throw new Error("E2B_API_KEY not configured");
