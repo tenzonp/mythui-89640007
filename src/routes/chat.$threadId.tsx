@@ -33,6 +33,10 @@ import {
   FileText,
   Image as ImageIcon,
   File as FileIcon,
+  Play,
+  Video as VideoIcon,
+  RotateCw,
+  UploadCloud,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
@@ -149,22 +153,29 @@ function ChatWindow({
   const fnDeleteMsg = useServerFn(deleteMessage);
 
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<
-    {
-      name: string;
-      url: string;
-      mime: string;
-      size: number;
-      isImage: boolean;
-      isPdf?: boolean;
-      pageCount?: number;
-    }[]
-  >([]);
-  const [uploading, setUploading] = useState(false);
+  type Att = {
+    id: string;
+    name: string;
+    mime: string;
+    size: number;
+    url?: string;
+    isImage?: boolean;
+    isPdf?: boolean;
+    isVideo?: boolean;
+    pageCount?: number;
+    thumbnail?: string; // data URL for video preview / image preview
+    status: "uploading" | "ready" | "error";
+    progress: number; // 0..100
+    error?: string;
+    _file?: File;
+  };
+  const [attachments, setAttachments] = useState<Att[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const fnUpload = useServerFn(uploadAttachment);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const uploading = attachments.some((a) => a.status === "uploading");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -178,45 +189,206 @@ function ChatWindow({
     if (status === "ready") onRefreshPendingInstagram();
   }, [status]);
 
-  const onPickFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    setUploading(true);
+  const patchAtt = (id: string, patch: Partial<Att>) =>
+    setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+
+  const uploadOne = async (att: Att, attempt = 1): Promise<void> => {
+    const f = att._file!;
     try {
-      const next = [...attachments];
-      for (const f of Array.from(files).slice(0, 6)) {
-        if (f.size > 20 * 1024 * 1024) {
-          toast.error(`${f.name} is over 20MB`);
-          continue;
-        }
-        const buf = await f.arrayBuffer();
-        let bin = "";
-        const u8 = new Uint8Array(buf);
-        for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-        const dataBase64 = btoa(bin);
-        try {
-          const r = await fnUpload({
-            data: { name: f.name, dataBase64, mime: f.type || undefined },
-          });
-          next.push(r);
-        } catch (e: any) {
-          toast.error(e?.message ?? "Upload failed");
-        }
+      // Reading phase progress: 0 → 25
+      patchAtt(att.id, { status: "uploading", progress: 5, error: undefined });
+      const buf = await f.arrayBuffer();
+      patchAtt(att.id, { progress: 25 });
+      let bin = "";
+      const u8 = new Uint8Array(buf);
+      const CHUNK = 0x8000;
+      for (let i = 0; i < u8.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(
+          null,
+          Array.from(u8.subarray(i, i + CHUNK)) as any,
+        );
       }
-      setAttachments(next);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      const dataBase64 = btoa(bin);
+      patchAtt(att.id, { progress: 55 });
+
+      // Smooth progress while server fn runs
+      const ticker = setInterval(() => {
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === att.id && a.status === "uploading" && a.progress < 92
+              ? { ...a, progress: a.progress + 3 }
+              : a,
+          ),
+        );
+      }, 350);
+
+      try {
+        const r = await fnUpload({
+          data: { name: f.name, dataBase64, mime: f.type || undefined },
+        });
+        clearInterval(ticker);
+        patchAtt(att.id, {
+          status: "ready",
+          progress: 100,
+          url: r.url,
+          mime: r.mime,
+          size: r.size,
+          isImage: r.isImage,
+          isPdf: r.isPdf,
+          pageCount: r.pageCount,
+        });
+      } finally {
+        clearInterval(ticker);
+      }
+    } catch (e: any) {
+      if (attempt < 3) {
+        await new Promise((res) => setTimeout(res, 600 * attempt));
+        return uploadOne(att, attempt + 1);
+      }
+      patchAtt(att.id, { status: "error", error: e?.message ?? "Upload failed" });
+      toast.error(`${f.name}: ${e?.message ?? "Upload failed"}`);
     }
+  };
+
+  const makeVideoThumb = (file: File): Promise<string | undefined> =>
+    new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.src = url;
+        v.onloadedmetadata = () => {
+          try {
+            v.currentTime = Math.min(0.5, (v.duration || 1) / 2);
+          } catch {
+            resolve(undefined);
+          }
+        };
+        v.onseeked = () => {
+          try {
+            const c = document.createElement("canvas");
+            c.width = v.videoWidth || 320;
+            c.height = v.videoHeight || 180;
+            const ctx = c.getContext("2d");
+            if (!ctx) return resolve(undefined);
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            resolve(c.toDataURL("image/jpeg", 0.7));
+          } catch {
+            resolve(undefined);
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        };
+        v.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve(undefined);
+        };
+      } catch {
+        resolve(undefined);
+      }
+    });
+
+  const addFiles = async (files: FileList | File[] | null) => {
+    if (!files) return;
+    const arr = Array.from(files as any as File[]).slice(0, 10);
+    if (!arr.length) return;
+    const fresh: Att[] = [];
+    for (const f of arr) {
+      if (f.size > 20 * 1024 * 1024) {
+        toast.error(`${f.name} is over 20MB`);
+        continue;
+      }
+      const mime = f.type || "";
+      const att: Att = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: f.name,
+        mime,
+        size: f.size,
+        isImage: mime.startsWith("image/"),
+        isPdf: mime.includes("pdf"),
+        isVideo: mime.startsWith("video/"),
+        status: "uploading",
+        progress: 0,
+        _file: f,
+      };
+      if (att.isImage) {
+        att.thumbnail = URL.createObjectURL(f);
+      }
+      fresh.push(att);
+    }
+    if (!fresh.length) return;
+    setAttachments((p) => [...p, ...fresh]);
+    // Kick off uploads + video thumbs in parallel
+    for (const att of fresh) {
+      if (att.isVideo) {
+        makeVideoThumb(att._file!).then((thumb) => {
+          if (thumb) patchAtt(att.id, { thumbnail: thumb });
+        });
+      }
+      uploadOne(att);
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const retryAtt = (id: string) => {
+    const a = attachments.find((x) => x.id === id);
+    if (a) uploadOne({ ...a, progress: 0, status: "uploading" });
+  };
+
+  // Window-level drag and drop
+  useEffect(() => {
+    let depth = 0;
+    const onEnter = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      depth++;
+      setDragOver(true);
+    };
+    const onLeave = () => {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragOver(false);
+    };
+    const onOver = (e: DragEvent) => {
+      if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer?.files?.length) return;
+      e.preventDefault();
+      depth = 0;
+      setDragOver(false);
+      addFiles(e.dataTransfer.files);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [attachments.length]);
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    const files = e.clipboardData?.files;
+    if (files && files.length) addFiles(files);
   };
 
   const submit = async () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || status === "submitted" || status === "streaming")
+    const ready = attachments.filter((a) => a.status === "ready" && a.url);
+    if ((!text && ready.length === 0) || status === "submitted" || status === "streaming")
       return;
+    if (attachments.some((a) => a.status === "uploading")) {
+      toast.error("Wait for uploads to finish");
+      return;
+    }
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const atts = attachments.map((a) => ({
+    const atts = ready.map((a) => ({
       ...a,
-      url: a.url.startsWith("http") ? a.url : `${origin}${a.url}`,
+      url: a.url!.startsWith("http") ? a.url! : `${origin}${a.url}`,
     }));
     const attLines = atts.length
       ? "\n\n📎 Attached files (use run_code with `requests` to download/inspect, or web_fetch for text URLs):\n" +
@@ -229,11 +401,7 @@ function ChatWindow({
       : "";
     const parts: any[] = [{ type: "text", text: (text || "(see attached files)") + attLines }];
     for (const a of atts) {
-      if (a.isImage) {
-        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
-      } else {
-        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
-      }
+      parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
     }
     setInput("");
     setAttachments([]);
@@ -336,7 +504,7 @@ function ChatWindow({
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
-                {attachments.map((a, i) => {
+                {attachments.map((a) => {
                   const ext = (a.mime ?? "").split("/").pop()?.toUpperCase();
                   const meta = [
                     ext,
@@ -347,34 +515,65 @@ function ChatWindow({
                     .join(" · ");
                   return (
                     <div
-                      key={i}
-                      className="group relative flex items-center gap-2 border rounded-lg pl-1.5 pr-2 py-1 text-xs bg-muted/40"
+                      key={a.id}
+                      className="group relative flex items-center gap-2 border rounded-lg pl-1.5 pr-2 py-1 text-xs bg-muted/40 overflow-hidden"
                     >
-                      {a.isImage ? (
-                        <img
-                          src={a.url}
-                          alt={a.name}
-                          className="w-8 h-8 rounded object-cover"
-                        />
-                      ) : a.isPdf ? (
-                        <FileText className="w-4 h-4 text-muted-foreground mx-1" />
-                      ) : (
-                        <FileIcon className="w-4 h-4 text-muted-foreground mx-1" />
-                      )}
+                      <div className="relative w-8 h-8 rounded overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                        {a.thumbnail ? (
+                          <img src={a.thumbnail} alt="" className="w-full h-full object-cover" />
+                        ) : a.isPdf ? (
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                        ) : a.isVideo ? (
+                          <VideoIcon className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <FileIcon className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        {a.isVideo && a.thumbnail && (
+                          <Play className="w-3 h-3 text-white absolute inset-0 m-auto drop-shadow" />
+                        )}
+                      </div>
                       <div className="min-w-0">
                         <div className="max-w-[160px] truncate">{a.name}</div>
-                        <div className="text-[10px] text-muted-foreground">{meta}</div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          {a.status === "uploading" && (
+                            <>
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              {Math.round(a.progress)}%
+                            </>
+                          )}
+                          {a.status === "ready" && meta}
+                          {a.status === "error" && (
+                            <span className="text-destructive">Failed</span>
+                          )}
+                        </div>
                       </div>
+                      {a.status === "error" && (
+                        <button
+                          type="button"
+                          onClick={() => retryAtt(a.id)}
+                          className="opacity-70 hover:opacity-100"
+                          aria-label="Retry"
+                          title="Retry upload"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
-                          setAttachments((p) => p.filter((_, j) => j !== i))
+                          setAttachments((p) => p.filter((x) => x.id !== a.id))
                         }
                         className="opacity-60 hover:opacity-100"
                         aria-label="Remove"
                       >
                         <X className="w-3 h-3" />
                       </button>
+                      {a.status === "uploading" && (
+                        <div
+                          className="absolute bottom-0 left-0 h-0.5 bg-primary transition-all"
+                          style={{ width: `${a.progress}%` }}
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -384,6 +583,7 @@ function ChatWindow({
               ref={taRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={onPaste}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -391,7 +591,7 @@ function ChatWindow({
                 }
               }}
               rows={1}
-              placeholder="Ask your AI team anything…"
+              placeholder="Ask your AI team anything… (drag & drop or paste files)"
               className="w-full resize-none bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none max-h-48"
             />
             <input
@@ -399,7 +599,7 @@ function ChatWindow({
               type="file"
               multiple
               hidden
-              onChange={(e) => onPickFiles(e.target.files)}
+              onChange={(e) => addFiles(e.target.files)}
             />
             <button
               type="button"
@@ -434,6 +634,17 @@ function ChatWindow({
           </p>
         </div>
       </div>
+      {dragOver && (
+        <div className="pointer-events-none fixed inset-0 z-40 bg-primary/10 backdrop-blur-sm flex items-center justify-center">
+          <div className="rounded-2xl border-2 border-dashed border-primary bg-background/95 px-8 py-6 flex flex-col items-center gap-2 shadow-xl">
+            <UploadCloud className="w-8 h-8 text-primary" />
+            <div className="text-sm font-medium">Drop files to attach</div>
+            <div className="text-xs text-muted-foreground">
+              Images, videos, PDFs, CSVs · up to 20MB each
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -495,6 +706,15 @@ function bytesLabel(n?: number) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function classifyFile(f: any) {
+  const mime = (f.mediaType ?? f.mime ?? "").toLowerCase();
+  const name = (f.filename ?? f.name ?? "").toLowerCase();
+  const isImage = mime.startsWith("image/");
+  const isVideo = mime.startsWith("video/") || /\.(mp4|webm|mov|m4v|ogv)$/.test(name);
+  const isPdf = mime.includes("pdf") || name.endsWith(".pdf");
+  return { isImage, isVideo, isPdf, viewable: isImage || isVideo || isPdf };
+}
+
 function FileGrid({
   files,
   align = "start",
@@ -502,42 +722,70 @@ function FileGrid({
   files: any[];
   align?: "start" | "end";
 }) {
-  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
   if (!files.length) return null;
-  const images = files.filter((f) => (f.mediaType ?? f.mime ?? "").startsWith("image/"));
-  const others = files.filter((f) => !(f.mediaType ?? f.mime ?? "").startsWith("image/"));
+  const viewable = files.filter((f) => classifyFile(f).viewable);
+  const others = files.filter((f) => !classifyFile(f).viewable);
   const justify = align === "end" ? "justify-end" : "justify-start";
+  const onlyImages = viewable.every((f) => classifyFile(f).isImage);
 
   return (
     <div className={`flex flex-col gap-2 ${align === "end" ? "items-end" : "items-start"} max-w-full`}>
-      {images.length > 0 && (
+      {viewable.length > 0 && (
         <div
           className={`grid gap-1.5 ${justify} ${
-            images.length === 1
+            viewable.length === 1
               ? "grid-cols-1"
-              : images.length === 2
+              : viewable.length === 2
                 ? "grid-cols-2"
                 : "grid-cols-3"
           }`}
           style={{ maxWidth: 360 }}
         >
-          {images.map((f, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setLightboxIdx(i)}
-              className="block overflow-hidden rounded-lg border bg-muted/30 hover:opacity-90 transition"
-            >
-              <img
-                src={f.url}
-                alt={f.filename ?? f.name ?? "image"}
-                className={`object-cover ${
-                  images.length === 1 ? "max-h-72 w-auto" : "h-28 w-28"
-                }`}
-                loading="lazy"
-              />
-            </button>
-          ))}
+          {viewable.map((f, i) => {
+            const { isImage, isVideo, isPdf } = classifyFile(f);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setViewerIdx(i)}
+                className="relative block overflow-hidden rounded-lg border bg-muted/30 hover:opacity-90 transition group"
+              >
+                {isImage ? (
+                  <img
+                    src={f.url}
+                    alt={f.filename ?? f.name ?? "image"}
+                    className={`object-cover ${
+                      onlyImages && viewable.length === 1 ? "max-h-72 w-auto" : "h-28 w-28"
+                    }`}
+                    loading="lazy"
+                  />
+                ) : isVideo ? (
+                  <div className="h-28 w-28 relative bg-black flex items-center justify-center">
+                    <video
+                      src={f.url}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition" />
+                    <Play className="w-7 h-7 text-white relative drop-shadow" />
+                  </div>
+                ) : isPdf ? (
+                  <div className="h-28 w-28 bg-card flex flex-col items-center justify-center text-center px-2">
+                    <FileText className="w-6 h-6 text-primary mb-1" />
+                    <div className="text-[10px] truncate w-full">{f.filename ?? f.name}</div>
+                    {f.pageCount && (
+                      <div className="text-[10px] text-muted-foreground">
+                        {f.pageCount}p
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       )}
       {others.length > 0 && (
@@ -547,12 +795,12 @@ function FileGrid({
           ))}
         </div>
       )}
-      {lightboxIdx !== null && (
+      {viewerIdx !== null && (
         <Lightbox
-          images={images}
-          index={lightboxIdx}
-          onClose={() => setLightboxIdx(null)}
-          onIndex={setLightboxIdx}
+          images={viewable}
+          index={viewerIdx}
+          onClose={() => setViewerIdx(null)}
+          onIndex={setViewerIdx}
         />
       )}
     </div>
@@ -631,12 +879,41 @@ function Lightbox({
       >
         <Download className="w-5 h-5" />
       </a>
-      <img
-        src={img.url}
-        alt={img.filename ?? "image"}
-        className="max-h-[90vh] max-w-[92vw] object-contain"
-        onClick={(e) => e.stopPropagation()}
-      />
+      {(() => {
+        const { isImage, isVideo, isPdf } = classifyFile(img);
+        const name = img.filename ?? img.name ?? "file";
+        if (isVideo) {
+          return (
+            <video
+              key={img.url}
+              src={img.url}
+              controls
+              autoPlay
+              className="max-h-[90vh] max-w-[92vw] bg-black"
+              onClick={(e) => e.stopPropagation()}
+            />
+          );
+        }
+        if (isPdf) {
+          return (
+            <iframe
+              key={img.url}
+              src={img.url}
+              title={name}
+              className="w-[92vw] h-[90vh] bg-white rounded"
+              onClick={(e) => e.stopPropagation()}
+            />
+          );
+        }
+        return (
+          <img
+            src={img.url}
+            alt={isImage ? name : "preview"}
+            className="max-h-[90vh] max-w-[92vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+      })()}
       {images.length > 1 && (
         <>
           <button
