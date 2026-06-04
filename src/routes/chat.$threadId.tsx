@@ -896,13 +896,7 @@ function Lightbox({
         }
         if (isPdf) {
           return (
-            <iframe
-              key={img.url}
-              src={img.url}
-              title={name}
-              className="w-[92vw] h-[90vh] bg-white rounded"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <PdfViewer key={img.url} file={img} name={name} />
           );
         }
         return (
