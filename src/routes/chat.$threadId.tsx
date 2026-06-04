@@ -672,7 +672,8 @@ function ChatWindow({
 
 
       <div className="border-t bg-background">
-        <div className="max-w-[760px] mx-auto p-4">
+        <div className="max-w-[760px] mx-auto px-4 py-3">
+
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
