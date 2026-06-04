@@ -172,7 +172,7 @@ export async function stageFileBufferForTool(args: {
   if (upload.metadata?.storage_backend === "azure_blob_storage") {
     headers["x-ms-blob-type"] = "BlockBlob";
   }
-  const res = await fetch(uploadUrl, { method: "PUT", headers, body: args.bytes });
+  const res = await fetch(uploadUrl, { method: "PUT", headers, body: Buffer.from(args.bytes) });
   if (!res.ok) throw new Error(`Composio file upload failed (${res.status})`);
   return { name: args.filename, mimetype: args.mimetype, s3key: upload.key };
 }
