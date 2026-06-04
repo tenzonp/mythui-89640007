@@ -13,14 +13,24 @@ HARD REQUIREMENTS:
   tailwindcss 3.4.10, postcss 8.4.41, autoprefixer 10.4.20,
   @types/react 18.3.3, @types/react-dom 18.3.0, @types/node 20.14.10,
   framer-motion 11.3.19, lucide-react 0.427.0, clsx 2.1.1
-- No external image URLs; use CSS gradients, SVG, or inline data URIs.
-- No env vars, no API routes that require secrets.
-- Keep total files <= 22.
-- Always include: package.json, tsconfig.json, next.config.mjs, postcss.config.js, tailwind.config.ts, app/globals.css, app/layout.tsx, app/page.tsx.
-- Design quality: futuristic, awwwards-grade. Custom typography pairings, bold hero, real micro-interactions via framer-motion, semantic sections, accessibility, mobile-first responsive.
-- Include realistic copy tailored to the user's idea (no lorem ipsum).
-- next.config.mjs must export default {}; no experimental flags.
+- next.config.mjs must include images.remotePatterns allowing images.unsplash.com, images.pexels.com, cdn.pixabay.com, plus generic https. Example:
+  /** @type {import('next').NextConfig} */
+  export default { images: { remotePatterns: [{ protocol: "https", hostname: "**" }] } };
 - tsconfig.json strict: true, moduleResolution "bundler".
+- No env vars, no API routes that require secrets.
+- Keep total files <= 24.
+- Always include: package.json, tsconfig.json, next.config.mjs, postcss.config.js, tailwind.config.ts, app/globals.css, app/layout.tsx, app/page.tsx.
+
+INTERNET ASSETS — USE THEM LIBERALLY:
+- Images: pull real photography from Unsplash (https://images.unsplash.com/photo-...) or Pexels (https://images.pexels.com/photos/...). Pick URLs you are confident exist. Use Next.js <Image /> with width/height. Provide descriptive alt text.
+- Icons: import from lucide-react (already a dependency).
+- Animations: prefer framer-motion. You may also embed a Lottie animation by URL via <DotLottieReact src="https://lottie.host/..." /> only if you also add @lottiefiles/dotlottie-react to dependencies (otherwise skip Lottie).
+- Videos: embed YouTube or Vimeo via <iframe>, or use <video> with a public MP4 URL from coverr.co / mixkit.co / pexels.com videos. Always include controls or autoPlay + muted + playsInline + loop for background video.
+- Backgrounds: gradients, CSS, SVG, and real internet photography are all encouraged.
+
+DESIGN QUALITY:
+- Futuristic, awwwards-grade. Bold hero, custom typography pairings (Google Fonts via next/font), real micro-interactions via framer-motion, semantic sections (header, hero, features, social proof, CTA, footer), accessibility, mobile-first responsive.
+- Realistic copy tailored to the user's idea and business knowledge — no lorem ipsum.
 
 OUTPUT JSON SCHEMA:
 { "files": [ { "path": "string (relative)", "content": "string" } ] }`;
@@ -29,13 +39,15 @@ export async function generateSiteFiles(opts: {
   name: string;
   prompt: string;
   styleNotes?: string;
+  businessContext?: string;
 }): Promise<GeneratedFile[]> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
   const userMsg = `Project name: ${opts.name}
 User idea: ${opts.prompt}
-Style notes: ${opts.styleNotes ?? "(none — surprise with something futuristic and bold)"}`;
+Style notes: ${opts.styleNotes ?? "(none — surprise with something futuristic and bold)"}
+${opts.businessContext ? `\nBUSINESS CONTEXT (use to write real, tailored copy):\n${opts.businessContext}` : ""}`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -67,7 +79,6 @@ Style notes: ${opts.styleNotes ?? "(none — surprise with something futuristic 
   try {
     parsed = JSON.parse(content);
   } catch {
-    // Try to recover a JSON object from messy output
     const start = content.indexOf("{");
     const end = content.lastIndexOf("}");
     if (start === -1 || end === -1) throw new Error("AI did not return JSON");
