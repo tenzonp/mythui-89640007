@@ -27,6 +27,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AiEmployeesAgentIdRouteImport } from './routes/ai-employees.$agentId'
 import { Route as ApiFilesSplatRouteImport } from './routes/api/files/$'
 import { Route as ApiPublicInstagramWebhookRouteImport } from './routes/api/public/instagram/webhook'
+import { Route as ApiPublicDodoWebhookRouteImport } from './routes/api/public/dodo/webhook'
 
 const SolutionsRoute = SolutionsRouteImport.update({
   id: '/solutions',
@@ -119,6 +120,11 @@ const ApiPublicInstagramWebhookRoute =
     path: '/api/public/instagram/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicDodoWebhookRoute = ApiPublicDodoWebhookRouteImport.update({
+  id: '/api/public/dodo/webhook',
+  path: '/api/public/dodo/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
+  '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/ai-employees': typeof AiEmployeesIndexRoute
   '/chat': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
+  '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRoutesById {
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
+  '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/ai-employees/'
     | '/chat/'
     | '/api/files/$'
+    | '/api/public/dodo/webhook'
     | '/api/public/instagram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/ai-employees'
     | '/chat'
     | '/api/files/$'
+    | '/api/public/dodo/webhook'
     | '/api/public/instagram/webhook'
   id:
     | '__root__'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/ai-employees/'
     | '/chat/'
     | '/api/files/$'
+    | '/api/public/dodo/webhook'
     | '/api/public/instagram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -258,6 +270,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
   ApiFilesSplatRoute: typeof ApiFilesSplatRoute
+  ApiPublicDodoWebhookRoute: typeof ApiPublicDodoWebhookRoute
   ApiPublicInstagramWebhookRoute: typeof ApiPublicInstagramWebhookRoute
 }
 
@@ -389,6 +402,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInstagramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/dodo/webhook': {
+      id: '/api/public/dodo/webhook'
+      path: '/api/public/dodo/webhook'
+      fullPath: '/api/public/dodo/webhook'
+      preLoaderRoute: typeof ApiPublicDodoWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -420,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
   ApiFilesSplatRoute: ApiFilesSplatRoute,
+  ApiPublicDodoWebhookRoute: ApiPublicDodoWebhookRoute,
   ApiPublicInstagramWebhookRoute: ApiPublicInstagramWebhookRoute,
 }
 export const routeTree = rootRouteImport
