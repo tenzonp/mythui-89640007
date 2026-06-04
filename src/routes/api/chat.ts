@@ -829,12 +829,61 @@ export const Route = createFileRoute("/api/chat")({
           model = deepseek(chosenModel);
         }
 
+        // For vision turns, inline image attachments as base64 data URIs so the
+        // model never has to reach back over the network to a preview URL
+        // (which often fails with "Provider returned error" on Gemini).
+        let outgoingMessages = body.messages;
+        if (hasImageAttachment) {
+          outgoingMessages = await Promise.all(
+            body.messages.map(async (m: any) => {
+              if (m.role !== "user" || !Array.isArray(m.parts)) return m;
+              const parts = await Promise.all(
+                m.parts.map(async (p: any) => {
+                  if (
+                    p?.type !== "file" ||
+                    typeof p.url !== "string" ||
+                    typeof p.mediaType !== "string" ||
+                    !p.mediaType.startsWith("image/") ||
+                    p.url.startsWith("data:")
+                  )
+                    return p;
+                  try {
+                    const u = new URL(p.url);
+                    const marker = "/api/files/";
+                    const idx = u.pathname.indexOf(marker);
+                    if (idx === -1) return p;
+                    const storagePath = decodeURIComponent(u.pathname.slice(idx + marker.length));
+                    const { data, error } = await supabaseAdmin.storage
+                      .from("artifacts")
+                      .download(storagePath);
+                    if (error || !data) return p;
+                    const buf = new Uint8Array(await data.arrayBuffer());
+                    let bin = "";
+                    const CHUNK = 0x8000;
+                    for (let i = 0; i < buf.length; i += CHUNK) {
+                      bin += String.fromCharCode.apply(
+                        null,
+                        Array.from(buf.subarray(i, i + CHUNK)) as any,
+                      );
+                    }
+                    const b64 = btoa(bin);
+                    return { ...p, url: `data:${p.mediaType};base64,${b64}` };
+                  } catch {
+                    return p;
+                  }
+                }),
+              );
+              return { ...m, parts };
+            }),
+          );
+        }
+
         const result = streamText({
           model,
           system,
           tools: aiTools,
           stopWhen: stepCountIs(50),
-          messages: await convertToModelMessages(body.messages),
+          messages: await convertToModelMessages(outgoingMessages),
         });
 
         const threadId = body.threadId;
