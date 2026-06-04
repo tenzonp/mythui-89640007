@@ -82,7 +82,7 @@ function createWebFetchTool() {
   });
 }
 
-function createRunCodeTool(userId: string) {
+function createRunCodeTool(userId: string, employeeId?: string, employeeName?: string) {
   return tool({
     description:
       "Run real code in a live Linux sandbox VM (E2B). Use this WHENEVER the user asks you to: generate a PDF / PPTX / DOCX / XLSX / CSV / chart / image, do data analysis, run a calculation, scrape+process data, convert files, or execute arbitrary Python/JavaScript. Files you write inside the script will be uploaded automatically and returned as downloadable URLs — ALWAYS save outputs to a filename (e.g. `report.pdf`). Preinstalled Python libs include reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests. After the run, share the returned artifact URLs with the user as clickable links.",
@@ -115,6 +115,8 @@ function createRunCodeTool(userId: string) {
           userId,
           code: parsed.data.code,
           language: parsed.data.language ?? "python",
+          employeeId,
+          employeeName,
         });
       } catch (e: any) {
         return { error: e?.message ?? "Sandbox execution failed" };
