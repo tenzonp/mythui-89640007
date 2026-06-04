@@ -25,6 +25,13 @@ import {
 import { webSearch, webScrape } from "@/lib/firecrawl.server";
 import { runCode } from "@/lib/e2b.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
+import {
+  canStartTurn,
+  chargeTurn,
+  computeFinalCost,
+  inferComplexity,
+} from "@/lib/credits.server";
+import { getWynsaModel, type WynsaModelId } from "@/lib/plans";
 
 function createWebSearchTool() {
   return tool({
