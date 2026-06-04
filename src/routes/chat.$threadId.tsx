@@ -634,6 +634,17 @@ function ChatWindow({
           </p>
         </div>
       </div>
+      {dragOver && (
+        <div className="pointer-events-none fixed inset-0 z-40 bg-primary/10 backdrop-blur-sm flex items-center justify-center">
+          <div className="rounded-2xl border-2 border-dashed border-primary bg-background/95 px-8 py-6 flex flex-col items-center gap-2 shadow-xl">
+            <UploadCloud className="w-8 h-8 text-primary" />
+            <div className="text-sm font-medium">Drop files to attach</div>
+            <div className="text-xs text-muted-foreground">
+              Images, videos, PDFs, CSVs · up to 20MB each
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
