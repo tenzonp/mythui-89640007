@@ -941,6 +941,78 @@ function Lightbox({
   );
 }
 
+function PdfViewer({ file, name }: { file: any; name: string }) {
+  const total: number =
+    typeof file.pageCount === "number" && file.pageCount > 0 ? file.pageCount : 1;
+  const [page, setPage] = useState(1);
+  const go = (n: number) => setPage(Math.max(1, Math.min(total, n)));
+  // Use #page=N hash to jump in the browser's built-in PDF viewer.
+  const src = `${file.url}#page=${page}&view=FitH&toolbar=1`;
+  return (
+    <div
+      className="flex flex-col items-stretch gap-2 w-[92vw] h-[90vh]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <iframe src={src} title={name} className="flex-1 bg-white rounded" />
+      <div className="flex items-center gap-2 bg-black/60 rounded-lg p-2">
+        <button
+          type="button"
+          onClick={() => go(page - 1)}
+          disabled={page <= 1}
+          className="text-white/80 hover:text-white disabled:opacity-30 px-2"
+          aria-label="Previous page"
+        >
+          ‹
+        </button>
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex gap-1.5 px-1">
+            {Array.from({ length: total }, (_, i) => i + 1).map((n) => {
+              const active = n === page;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => go(n)}
+                  className={`shrink-0 w-12 h-16 rounded border text-[11px] flex flex-col items-center justify-end pb-1 transition ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-white/10 text-white/80 border-white/20 hover:bg-white/20"
+                  }`}
+                  aria-label={`Go to page ${n}`}
+                >
+                  <FileText className="w-5 h-5 mb-0.5 opacity-80" />
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <input
+          type="number"
+          min={1}
+          max={total}
+          value={page}
+          onChange={(e) => go(parseInt(e.target.value, 10) || 1)}
+          className="w-14 text-center text-xs bg-white/10 text-white rounded px-1 py-1 border border-white/20"
+          aria-label="Page"
+        />
+        <span className="text-white/70 text-xs">/ {total}</span>
+        <button
+          type="button"
+          onClick={() => go(page + 1)}
+          disabled={page >= total}
+          className="text-white/80 hover:text-white disabled:opacity-30 px-2"
+          aria-label="Next page"
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+
 function renderFileParts(parts: any[]) {
   const files = parts.filter((p) => p.type === "file" && typeof p.url === "string");
   if (!files.length) return null;
