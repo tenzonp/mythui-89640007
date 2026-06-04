@@ -1,5 +1,9 @@
 // Composio v3 REST wrapper. Server-only.
+import { createHash } from "crypto";
+
 const BASE = "https://backend.composio.dev/api/v3";
+
+export type FileUploadable = { name: string; mimetype: string; s3key: string };
 
 function key() {
   const k = process.env.COMPOSIO_API_KEY;
@@ -137,4 +141,38 @@ export async function executeTool(slug: string, userId: string, args: any) {
       body: JSON.stringify({ user_id: userId, arguments: args }),
     },
   );
+}
+
+export async function stageFileBufferForTool(args: {
+  bytes: Uint8Array;
+  filename: string;
+  mimetype: string;
+  toolSlug: string;
+  toolkitSlug: string;
+}): Promise<FileUploadable> {
+  const md5 = createHash("md5").update(args.bytes).digest("hex");
+  const upload = await call<{
+    key: string;
+    new_presigned_url?: string;
+    newPresignedUrl?: string;
+    metadata?: { storage_backend?: "s3" | "azure_blob_storage" };
+  }>(`/files/upload/request`, {
+    method: "POST",
+    body: JSON.stringify({
+      md5,
+      filename: args.filename,
+      mimetype: args.mimetype,
+      tool_slug: args.toolSlug,
+      toolkit_slug: args.toolkitSlug,
+    }),
+  });
+  const uploadUrl = upload.new_presigned_url || upload.newPresignedUrl;
+  if (!upload.key || !uploadUrl) throw new Error("Composio did not return an upload URL");
+  const headers: Record<string, string> = { "Content-Type": args.mimetype };
+  if (upload.metadata?.storage_backend === "azure_blob_storage") {
+    headers["x-ms-blob-type"] = "BlockBlob";
+  }
+  const res = await fetch(uploadUrl, { method: "PUT", headers, body: args.bytes });
+  if (!res.ok) throw new Error(`Composio file upload failed (${res.status})`);
+  return { name: args.filename, mimetype: args.mimetype, s3key: upload.key };
 }
