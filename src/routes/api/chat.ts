@@ -626,9 +626,14 @@ export const Route = createFileRoute("/api/chat")({
           aiTools.web_search = createWebSearchTool();
           aiTools.web_fetch = createWebFetchTool();
         }
-        // Always-on live code sandbox (E2B) for PDFs, PPTX, charts, data crunching.
-        if (process.env.E2B_API_KEY) {
-          aiTools.run_code = createRunCodeTool(userId, agent.id, agent.name);
+        // Always-on image generation (Lovable AI Gateway, low-cost).
+        if (process.env.LOVABLE_API_KEY) {
+          aiTools.generate_image = createGenerateImageTool(
+            process.env.LOVABLE_API_KEY,
+            userId,
+            agent.id,
+            agent.name,
+          );
         }
 
         // Give the CEO a delegate_to_employee tool that actually runs the
