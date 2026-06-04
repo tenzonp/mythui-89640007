@@ -325,27 +325,48 @@ function ChatWindow({
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
-                {attachments.map((a, i) => (
-                  <div
-                    key={i}
-                    className="group relative flex items-center gap-2 border rounded-lg px-2 py-1.5 text-xs bg-muted/40"
-                  >
-                    {a.isImage ? (
-                      <img src={a.url} alt={a.name} className="w-8 h-8 rounded object-cover" />
-                    ) : (
-                      <FileIcon className="w-4 h-4 text-muted-foreground" />
-                    )}
-                    <span className="max-w-[160px] truncate">{a.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))}
-                      className="opacity-60 hover:opacity-100"
-                      aria-label="Remove"
+                {attachments.map((a, i) => {
+                  const ext = (a.mime ?? "").split("/").pop()?.toUpperCase();
+                  const meta = [
+                    ext,
+                    a.pageCount ? `${a.pageCount}p` : null,
+                    bytesLabel(a.size),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <div
+                      key={i}
+                      className="group relative flex items-center gap-2 border rounded-lg pl-1.5 pr-2 py-1 text-xs bg-muted/40"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                      {a.isImage ? (
+                        <img
+                          src={a.url}
+                          alt={a.name}
+                          className="w-8 h-8 rounded object-cover"
+                        />
+                      ) : a.isPdf ? (
+                        <FileText className="w-4 h-4 text-muted-foreground mx-1" />
+                      ) : (
+                        <FileIcon className="w-4 h-4 text-muted-foreground mx-1" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="max-w-[160px] truncate">{a.name}</div>
+                        <div className="text-[10px] text-muted-foreground">{meta}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAttachments((p) => p.filter((_, j) => j !== i))
+                        }
+                        className="opacity-60 hover:opacity-100"
+                        aria-label="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <textarea
