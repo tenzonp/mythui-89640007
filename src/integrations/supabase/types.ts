@@ -14,6 +14,159 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_accounts: {
+        Row: {
+          created_at: string
+          handle: string | null
+          id: string
+          kind: string
+          notes: string | null
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          handle?: string | null
+          id?: string
+          kind: string
+          notes?: string | null
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          handle?: string | null
+          id?: string
+          kind?: string
+          notes?: string | null
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_knowledge_entries: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          source: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          source?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          source?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_profile: {
+        Row: {
+          created_at: string
+          description: string | null
+          extra: Json | null
+          industry: string | null
+          name: string | null
+          onboarding_completed_at: string | null
+          primary_goal: string | null
+          tagline: string | null
+          target_audience: string | null
+          tone: string | null
+          updated_at: string
+          user_id: string
+          value_props: string[] | null
+          website: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          extra?: Json | null
+          industry?: string | null
+          name?: string | null
+          onboarding_completed_at?: string | null
+          primary_goal?: string | null
+          tagline?: string | null
+          target_audience?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id: string
+          value_props?: string[] | null
+          website?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          extra?: Json | null
+          industry?: string | null
+          name?: string | null
+          onboarding_completed_at?: string | null
+          primary_goal?: string | null
+          tagline?: string | null
+          target_audience?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id?: string
+          value_props?: string[] | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      business_team_members: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       composio_connections: {
         Row: {
           connected_account_id: string | null

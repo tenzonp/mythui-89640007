@@ -851,6 +851,116 @@ export const Route = createFileRoute("/api/chat")({
         }
         aiTools.list_recent_files = createListRecentFilesTool(userId);
 
+        // Load business knowledge context for the system prompt.
+        const { getKnowledgeContext, searchKnowledge, recordKnowledgeEntry } = await import(
+          "@/lib/knowledge.server"
+        );
+        const knowledgeContext = await getKnowledgeContext(userId).catch(() => "");
+
+        // Knowledge tools — always on.
+        aiTools.lookup_knowledge = tool({
+          description:
+            "Search the user's business knowledge base (profile, team, accounts, entries) by query string. Use BEFORE asking the user a factual question about their business.",
+          inputSchema: jsonSchema({
+            type: "object",
+            required: ["query"],
+            properties: { query: { type: "string" } },
+          }),
+          execute: async (args: any) => {
+            const q = String(args?.query ?? "").trim();
+            if (!q) return { error: "query required" };
+            return { hits: await searchKnowledge(userId, q) };
+          },
+        });
+        aiTools.record_knowledge = tool({
+          description:
+            "Save a new long-term fact about the user's business to the knowledge base so future chats remember it. Only use for durable facts (not chit-chat).",
+          inputSchema: jsonSchema({
+            type: "object",
+            required: ["title", "body"],
+            properties: {
+              title: { type: "string" },
+              body: { type: "string" },
+              tags: { type: "array", items: { type: "string" } },
+            },
+          }),
+          execute: async (args: any) => {
+            const parsed = z
+              .object({
+                title: z.string().min(1).max(200),
+                body: z.string().min(1).max(20000),
+                tags: z.array(z.string().max(40)).max(20).optional(),
+              })
+              .safeParse(args);
+            if (!parsed.success) return { error: "Invalid arguments" };
+            const id = await recordKnowledgeEntry(userId, parsed.data.title, parsed.data.body, parsed.data.tags);
+            return { ok: true, id };
+          },
+        });
+
+        // build_website tool — full generate + ZIP + Vercel deploy in one call.
+        if (process.env.LOVABLE_API_KEY && process.env.VERCEL_TOKEN) {
+          aiTools.build_website = tool({
+            description:
+              "Generate and deploy a complete Next.js 14 website. Use whenever the user asks to build/create a website, landing page, or marketing site for their business. Returns a live URL and a downloadable ZIP. Costs 1000 credits. Pulls real internet images (Unsplash/Pexels), videos (YouTube/Vimeo), icons (lucide), and Framer Motion animations. Tailor the prompt using everything you know about the user's business.",
+            inputSchema: jsonSchema({
+              type: "object",
+              required: ["name", "prompt"],
+              properties: {
+                name: { type: "string", description: "Project slug (2-60 chars)." },
+                prompt: { type: "string", description: "Detailed creative brief for the site." },
+                styleNotes: { type: "string", description: "Optional visual direction." },
+              },
+            }),
+            execute: async (args: any) => {
+              const parsed = z
+                .object({
+                  name: z.string().min(2).max(60),
+                  prompt: z.string().min(10).max(4000),
+                  styleNotes: z.string().max(2000).optional(),
+                })
+                .safeParse(args);
+              if (!parsed.success) return { error: "Invalid arguments" };
+              try {
+                // Charge 1000 credits up front via credit_ledger.
+                const { data: bal } = await supabaseAdmin
+                  .from("credit_ledger")
+                  .select("amount")
+                  .eq("user_id", userId);
+                const balance = (bal ?? []).reduce((s: number, r: any) => s + (r.amount ?? 0), 0);
+                if (balance < 1000) {
+                  return { error: `Not enough credits — need 1000, have ${balance}.` };
+                }
+                await supabaseAdmin.from("credit_ledger").insert({
+                  user_id: userId,
+                  kind: "spend",
+                  amount: -1000,
+                  meta: { kind: "site_generate", name: parsed.data.name },
+                });
+
+                const { buildAndDeploySite } = await import("@/lib/site-build.server");
+                const result = await buildAndDeploySite({
+                  userId,
+                  name: parsed.data.name,
+                  prompt: parsed.data.prompt,
+                  styleNotes: parsed.data.styleNotes,
+                  businessContext: knowledgeContext || undefined,
+                });
+                return {
+                  ok: true,
+                  site_id: result.siteId,
+                  live_url: result.liveUrl,
+                  zip_url: result.zipUrl,
+                  file_count: result.fileCount,
+                  message: `Site is live at ${result.liveUrl} and the source ZIP is at ${result.zipUrl}. Share BOTH links in your reply as clickable markdown links.`,
+                };
+              } catch (e: any) {
+                return { error: e?.message ?? "Site build failed" };
+              }
+            },
+          });
+        }
+
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
         if (agent.canDelegate) {
