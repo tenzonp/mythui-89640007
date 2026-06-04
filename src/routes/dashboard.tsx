@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { agents } from "@/data/agents";
+import { getMyPlan } from "@/lib/credits.functions";
 import {
-  Activity,
   CheckCircle2,
   Clock,
   LogOut,
@@ -18,6 +19,7 @@ import {
   ChevronRight,
   MessageSquare,
   Plug,
+  UserCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
@@ -33,7 +35,8 @@ const sidebarLinks = [
   { to: "/integrations", label: "Integrations", icon: Plug },
   { to: "/ai-employees", label: "AI Employees", icon: Users },
   { to: "/solutions", label: "Solutions", icon: Briefcase },
-  { to: "/pricing", label: "Billing", icon: Zap },
+  { to: "/billing", label: "Plan & Billing", icon: Zap },
+  { to: "/profile", label: "Profile", icon: UserCircle },
 ];
 
 function Dashboard() {
