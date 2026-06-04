@@ -1,9 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { motion, AnimatePresence } from "framer-motion";
-import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +60,14 @@ const FLOW: StepId[] = [
 
 const TONES = ["warm", "expert", "playful", "premium", "bold", "calm", "witty", "minimal"];
 const INDUSTRIES = ["SaaS", "E-commerce", "Coffee / F&B", "Agency", "Creator", "Health", "Education", "Other"];
+const ORBS = [
+  { id: 0, x: 8, y: 12, s: 190, d: 10 },
+  { id: 1, x: 78, y: 18, s: 260, d: 13 },
+  { id: 2, x: 24, y: 68, s: 145, d: 11 },
+  { id: 3, x: 64, y: 72, s: 230, d: 14 },
+  { id: 4, x: 46, y: 28, s: 120, d: 9 },
+  { id: 5, x: 88, y: 58, s: 165, d: 12 },
+];
 
 function OnboardingPage() {
   const nav = useNavigate();
@@ -88,6 +94,7 @@ function OnboardingPage() {
 
   const finish = async () => {
     try { await saveProfile({ data: { complete: true } }); } catch {}
+    const confetti = (await import("canvas-confetti")).default;
     confetti({ particleCount: 180, spread: 90, origin: { y: 0.6 }, colors: ["#7c3aed", "#a78bfa", "#fde68a", "#34d399"] });
     setTimeout(() => confetti({ particleCount: 120, angle: 60, spread: 70, origin: { x: 0 } }), 200);
     setTimeout(() => confetti({ particleCount: 120, angle: 120, spread: 70, origin: { x: 1 } }), 400);
@@ -126,14 +133,7 @@ function OnboardingPage() {
 
       {/* Stage */}
       <div className="relative z-10 max-w-2xl mx-auto px-6 pt-10 pb-24 min-h-[70vh]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, y: 30, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -30, filter: "blur(8px)" }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          >
+        <div key={step} className="animate-in fade-in-0 slide-in-from-bottom-6 duration-500">
             {step === "intro" && <IntroScreen onStart={next} />}
 
             {step === "name" && (
@@ -263,8 +263,7 @@ function OnboardingPage() {
             )}
 
             {step === "done" && <DoneScreen onGoChat={() => nav({ to: "/chat" })} onGoKnowledge={() => nav({ to: "/knowledge" })} />}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   );
