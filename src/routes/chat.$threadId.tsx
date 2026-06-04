@@ -27,6 +27,12 @@ import {
   Brain,
   CheckCircle2,
   AlertCircle,
+  Paperclip,
+  Download,
+  X,
+  FileText,
+  Image as ImageIcon,
+  File as FileIcon,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
