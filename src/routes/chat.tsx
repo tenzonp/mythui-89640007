@@ -368,3 +368,47 @@ function ArtifactRow({ f }: { f: ThreadFile }) {
     <div className="px-1">{content}</div>
   );
 }
+
+function CreditsCard() {
+  const fetchPlan = useServerFn(getMyPlan);
+  const [plan, setPlan] = useState<any>(null);
+  useEffect(() => {
+    fetchPlan().then(setPlan).catch(() => {});
+  }, []);
+  if (!plan) return null;
+  const max =
+    plan.tier === "free" ? plan.dailyFreeCredits : plan.monthlyCredits;
+  const pct = max > 0 ? Math.min(100, Math.round((plan.balance / max) * 100)) : 0;
+  return (
+    <div className="bg-white rounded-xl border p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[13px] font-semibold">Credits</div>
+        <span className="text-[10.5px] uppercase tracking-wider text-violet font-medium">
+          {plan.planName}
+        </span>
+      </div>
+      <div className="rounded-lg border p-2.5">
+        <div className="flex items-baseline gap-1">
+          <span className="text-xl font-semibold tabular-nums">
+            {plan.balance.toLocaleString()}
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            / {max.toLocaleString()} {plan.tier === "free" ? "today" : "this month"}
+          </span>
+        </div>
+        <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-violet rounded-full transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <Link
+          to="/billing"
+          className="mt-2.5 block text-center text-[11px] py-1.5 rounded-md bg-violet text-white hover:bg-violet/90"
+        >
+          {plan.tier === "free" ? "Upgrade plan" : "Manage plan"}
+        </Link>
+      </div>
+    </div>
+  );
+}
