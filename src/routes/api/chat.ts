@@ -419,6 +419,21 @@ function createPendingInstagramReplyTool(userId: string) {
   });
 }
 
+function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
+  const schema = raw?.type ? { ...raw } : { type: "object", properties: raw ?? {} };
+  if (toolkitSlug?.toLowerCase() === "gmail" && schema.properties?.attachment) {
+    schema.properties = { ...schema.properties };
+    schema.properties.attachment = {
+      ...schema.properties.attachment,
+      anyOf: [
+        { type: "string", description: "Artifact URL, /api/files URL, or public URL to attach." },
+        schema.properties.attachment,
+      ],
+    };
+  }
+  return schema;
+}
+
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
@@ -427,7 +442,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
       t.input_parameters && typeof t.input_parameters === "object"
         ? (t.input_parameters as any)
         : { type: "object", properties: {} };
-    const schema = raw.type ? raw : { type: "object", properties: raw };
+    const schema = normalizeToolInputSchema(raw, t.toolkit?.slug);
     const isInstagram = (t.toolkit?.slug ?? "").toLowerCase() === "instagram";
     const isInstagramSend = isInstagramSendTool(t);
     out[safeName] = tool({
