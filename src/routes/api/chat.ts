@@ -795,6 +795,7 @@ export const Route = createFileRoute("/api/chat")({
             agent.name,
           );
         }
+        aiTools.list_recent_files = createListRecentFilesTool(userId);
 
         // Give the CEO a delegate_to_employee tool that actually runs the
         // specialist in the background and returns a timeline + final result.
@@ -894,6 +895,7 @@ export const Route = createFileRoute("/api/chat")({
                   sub.name,
                 );
               }
+              subTools.list_recent_files = createListRecentFilesTool(userId);
               try {
                 const result = streamText({
                   model: subModel,
