@@ -1106,22 +1106,81 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
+        // Track tool usage during the stream for credit math.
+        let toolCallCount = 0;
+        let usedResearch = false;
+        const delegatedAgentIds = new Set<string>();
+        delegatedAgentIds.add(agent.id);
+
         const result = streamText({
           model,
           system,
           tools: aiTools,
           stopWhen: stepCountIs(50),
           messages: await convertToModelMessages(outgoingMessages),
+          onStepFinish: (step) => {
+            for (const tc of step.toolCalls ?? []) {
+              toolCallCount++;
+              const t = String(tc.toolName ?? "").toLowerCase();
+              if (
+                t.includes("web_search") ||
+                t.includes("web_fetch") ||
+                t.includes("firecrawl") ||
+                t.includes("research")
+              )
+                usedResearch = true;
+              if (t === "delegate_to_employee") {
+                const emp = (tc.input as any)?.employee;
+                if (typeof emp === "string") delegatedAgentIds.add(emp);
+              }
+            }
+          },
         });
 
         const threadId = body.threadId;
         return result.toUIMessageStreamResponse({
           originalMessages: body.messages,
           onFinish: async ({ messages }) => {
-            if (!threadId) return;
             try {
               const lastUser = body.messages[body.messages.length - 1];
               const newAssistant = messages[messages.length - 1];
+              // Charge credits for this turn (always, even without thread).
+              try {
+                const outputChars = newAssistant?.role === "assistant"
+                  ? ((newAssistant.parts as any[]) ?? [])
+                      .map((p) => (p?.type === "text" ? String(p.text ?? "") : ""))
+                      .join("").length
+                  : 0;
+                const complexity = inferComplexity({
+                  outputChars,
+                  toolCalls: toolCallCount,
+                  delegatedAgents: delegatedAgentIds.size,
+                });
+                const cost = computeFinalCost({
+                  modelId: wynsa.id,
+                  complexity,
+                  usedResearch,
+                  delegatedAgents: delegatedAgentIds.size,
+                  isFree,
+                });
+                await chargeTurn({
+                  userId,
+                  threadId: threadId ?? null,
+                  modelId: wynsa.id,
+                  agentId: agent.id,
+                  complexity,
+                  amount: cost,
+                  meta: {
+                    tool_calls: toolCallCount,
+                    used_research: usedResearch,
+                    delegated: Array.from(delegatedAgentIds),
+                    output_chars: outputChars,
+                  },
+                });
+              } catch (e) {
+                console.error("credit charge failed", e);
+              }
+              if (!threadId) return;
               const rows: any[] = [];
               if (lastUser && lastUser.role === "user") {
                 rows.push({
