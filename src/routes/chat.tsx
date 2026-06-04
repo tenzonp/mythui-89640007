@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -20,9 +20,15 @@ import {
   FileText,
   Image as ImageIcon,
   FileCode2,
+  File as FileIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { agents, getAgent } from "@/data/agents";
+import {
+  ChatActivityProvider,
+  useChatActivity,
+  type ThreadFile,
+} from "@/lib/chat-context";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({ meta: [{ title: "Chat · Mythmind" }] }),
@@ -40,22 +46,27 @@ function formatWhen(iso?: string) {
     d.getFullYear() === now.getFullYear() &&
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate();
-  if (sameDay) {
-    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
+  if (sameDay) return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const yest = new Date(now);
   yest.setDate(now.getDate() - 1);
   if (
     d.getFullYear() === yest.getFullYear() &&
     d.getMonth() === yest.getMonth() &&
     d.getDate() === yest.getDate()
-  ) {
+  )
     return "Yesterday";
-  }
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 function ChatLayout() {
+  return (
+    <ChatActivityProvider>
+      <ChatLayoutInner />
+    </ChatActivityProvider>
+  );
+}
+
+function ChatLayoutInner() {
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
   const params = useParams({ strict: false }) as { threadId?: string };
@@ -94,11 +105,6 @@ function ChatLayout() {
     refresh();
   };
 
-  const activeThread = useMemo(
-    () => threads.find((t) => t.id === params.threadId) ?? null,
-    [threads, params.threadId],
-  );
-
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
@@ -114,21 +120,21 @@ function ChatLayout() {
   return (
     <div className="h-screen flex bg-[#f7f7f5] overflow-hidden">
       {/* LEFT SIDEBAR */}
-      <aside className="w-[260px] shrink-0 border-r bg-white hidden md:flex flex-col">
-        <div className="px-5 pt-5 pb-3">
-          <Link to="/" className="font-serif text-[22px] tracking-tight">
+      <aside className="w-[240px] shrink-0 border-r bg-white hidden md:flex flex-col">
+        <div className="px-4 pt-4 pb-2">
+          <Link to="/" className="font-serif text-[20px] tracking-tight">
             mythmind<span className="text-violet">.</span>
           </Link>
         </div>
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-2">
           <button
             onClick={newChat}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-foreground/10 bg-white py-2.5 text-sm font-medium hover:bg-accent/60 shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-foreground/10 bg-white py-2 text-[13px] font-medium hover:bg-accent/60 shadow-[0_1px_0_rgba(0,0,0,0.02)]"
           >
             <Plus className="w-4 h-4" /> New Conversation
           </button>
         </div>
-        <div className="px-5 pt-2 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           Conversations
         </div>
         <div className="flex-1 overflow-y-auto px-2 pb-2">
@@ -141,13 +147,13 @@ function ChatLayout() {
               <div
                 key={t.id}
                 className={cn(
-                  "group flex items-start gap-2 rounded-lg px-2.5 py-2 text-sm cursor-pointer",
+                  "group flex items-start gap-2 rounded-lg px-2 py-1.5 text-[13px] cursor-pointer",
                   active ? "bg-violet/10" : "hover:bg-accent/60",
                 )}
               >
                 <CheckSquare
                   className={cn(
-                    "w-4 h-4 mt-0.5 shrink-0",
+                    "w-3.5 h-3.5 mt-0.5 shrink-0",
                     active ? "text-violet" : "text-muted-foreground",
                   )}
                 />
@@ -157,7 +163,7 @@ function ChatLayout() {
                   className="flex-1 min-w-0"
                 >
                   <div className="truncate font-medium leading-tight">{t.title}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
                     {formatWhen(t.updated_at)}
                   </div>
                 </Link>
@@ -170,58 +176,58 @@ function ChatLayout() {
                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive mt-0.5"
                   aria-label="Delete chat"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
             );
           })}
         </div>
-        <div className="border-t px-2 py-2 space-y-0.5">
+        <div className="border-t px-2 py-1.5 space-y-0.5">
           <Link
             to="/ai-employees"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/80 hover:bg-accent"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
           >
             <Users className="w-4 h-4" /> AI Employees
           </Link>
           <Link
             to="/integrations"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/80 hover:bg-accent"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
           >
             <Zap className="w-4 h-4" /> Automations
           </Link>
           <Link
             to="/resources"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/80 hover:bg-accent"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
           >
             <BookOpen className="w-4 h-4" /> Knowledge Base
           </Link>
           <Link
             to="/dashboard"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/80 hover:bg-accent"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
           >
             <SettingsIcon className="w-4 h-4" /> Settings
           </Link>
         </div>
-        <div className="border-t p-3 relative">
+        <div className="border-t p-2 relative">
           <button
             onClick={() => setUserMenu((v) => !v)}
-            className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent"
+            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent"
           >
             {ceo?.image ? (
-              <img src={ceo.image} alt="" className="w-9 h-9 rounded-full object-cover" />
+              <img src={ceo.image} alt="" className="w-8 h-8 rounded-full object-cover" />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white text-sm font-semibold">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
                 {initial}
               </div>
             )}
             <div className="flex-1 min-w-0 text-left">
-              <div className="text-sm font-medium truncate capitalize">{name}</div>
-              <div className="text-[11px] text-muted-foreground">CEO</div>
+              <div className="text-[13px] font-medium truncate capitalize">{name}</div>
+              <div className="text-[10px] text-muted-foreground">CEO</div>
             </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
           {userMenu && (
-            <div className="absolute bottom-16 left-3 right-3 rounded-xl border bg-card shadow-xl overflow-hidden">
+            <div className="absolute bottom-14 left-2 right-2 rounded-xl border bg-card shadow-xl overflow-hidden">
               <div className="px-3 py-2 border-b text-xs text-muted-foreground truncate">
                 {user.email}
               </div>
@@ -246,51 +252,58 @@ function ChatLayout() {
       </main>
 
       {/* RIGHT SIDEBAR */}
-      {params.threadId && (
-        <RightSidebar threadTitle={activeThread?.title ?? "Conversation"} />
-      )}
+      {params.threadId && <RightSidebar />}
     </div>
   );
 }
 
-function RightSidebar({ threadTitle }: { threadTitle: string }) {
-  const statuses = ["Online", "Working", "Working", "Working", "Working", "Idle"] as const;
+function RightSidebar() {
+  const { activity } = useChatActivity();
   return (
-    <aside className="w-[300px] shrink-0 border-l bg-[#fafaf8] hidden xl:flex flex-col overflow-y-auto">
+    <aside className="w-[280px] shrink-0 border-l bg-[#fafaf8] hidden xl:flex flex-col overflow-y-auto">
       {/* AI Employees */}
-      <section className="p-4">
-        <div className="bg-white rounded-2xl border p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold">AI Employees</div>
+      <section className="p-3">
+        <div className="bg-white rounded-xl border p-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="text-[13px] font-semibold">AI Employees</div>
             <Link to="/ai-employees" className="text-muted-foreground hover:text-foreground">
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="space-y-3">
-            {agents.map((a, i) => {
-              const st = statuses[i % statuses.length];
+          <div className="space-y-2">
+            {agents.map((a) => {
+              const isLin = a.id === "lin";
+              const working = activity.working.has(a.id);
+              const active = activity.active.has(a.id);
+              const st = working
+                ? "Working"
+                : isLin
+                  ? "Online"
+                  : active
+                    ? "Online"
+                    : "Idle";
               const dot =
                 st === "Online"
                   ? "bg-emerald-500"
                   : st === "Working"
-                    ? "bg-amber-500"
-                    : "bg-muted-foreground/50";
+                    ? "bg-amber-500 animate-pulse"
+                    : "bg-muted-foreground/40";
               return (
-                <div key={a.id} className="flex items-center gap-2.5">
+                <div key={a.id} className="flex items-center gap-2">
                   <img
                     src={a.image}
                     alt={a.name}
-                    className="w-8 h-8 rounded-full object-cover"
+                    className="w-7 h-7 rounded-full object-cover"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium leading-tight truncate">
+                    <div className="text-[12.5px] font-medium leading-tight truncate">
                       {a.name}
                     </div>
-                    <div className="text-[11px] text-muted-foreground truncate">
+                    <div className="text-[10.5px] text-muted-foreground truncate">
                       {a.role}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1 text-[10.5px] text-muted-foreground">
                     <span className={cn("w-1.5 h-1.5 rounded-full", dot)} />
                     {st}
                   </div>
@@ -302,59 +315,79 @@ function RightSidebar({ threadTitle }: { threadTitle: string }) {
       </section>
 
       {/* Current Task */}
-      <section className="px-4 pb-4">
-        <div className="bg-white rounded-2xl border p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold">Current Task</div>
-            <button className="text-[11px] text-violet hover:underline">View all</button>
+      <section className="px-3 pb-3">
+        <div className="bg-white rounded-xl border p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[13px] font-semibold">Current Task</div>
+            <span className="text-[10.5px] text-muted-foreground">
+              {activity.running ? "Running" : "Idle"}
+            </span>
           </div>
-          <div className="rounded-xl border p-3">
-            <div className="text-sm font-medium leading-snug line-clamp-2">{threadTitle}</div>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                <div className="h-full w-[62%] bg-violet rounded-full" />
-              </div>
-              <span className="text-[11px] text-muted-foreground">62%</span>
+          <div className="rounded-lg border p-2.5">
+            <div className="text-[12.5px] font-medium leading-snug line-clamp-2">
+              {activity.threadTitle || "New Conversation"}
             </div>
-            <div className="mt-2 text-[11px] text-muted-foreground">Running</div>
+            <div className="mt-2.5 flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-violet rounded-full transition-all"
+                  style={{ width: `${activity.progress}%` }}
+                />
+              </div>
+              <span className="text-[10.5px] text-muted-foreground">
+                {activity.progress}%
+              </span>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Recent Artifacts */}
-      <section className="px-4 pb-4">
-        <div className="bg-white rounded-2xl border p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold">Recent Artifacts</div>
-            <button className="text-[11px] text-violet hover:underline">View all</button>
+      <section className="px-3 pb-3">
+        <div className="bg-white rounded-xl border p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[13px] font-semibold">Recent Artifacts</div>
+            <span className="text-[10.5px] text-muted-foreground">
+              {activity.files.length}
+            </span>
           </div>
-          <ArtifactRow icon={<ImageIcon className="w-3.5 h-3.5" />} name="image.png" time="" tint="bg-violet/10 text-violet" />
-          <ArtifactRow icon={<FileCode2 className="w-3.5 h-3.5" />} name="run_code_output.json" time="" tint="bg-amber-100 text-amber-700" />
-          <ArtifactRow icon={<FileText className="w-3.5 h-3.5" />} name="email_draft.html" time="" tint="bg-rose-100 text-rose-700" />
+          {activity.files.length === 0 && (
+            <div className="text-[11px] text-muted-foreground py-2">No files yet.</div>
+          )}
+          {activity.files.slice(0, 6).map((f, i) => (
+            <ArtifactRow key={i} f={f} />
+          ))}
         </div>
       </section>
     </aside>
   );
 }
 
-function ArtifactRow({
-  icon,
-  name,
-  time,
-  tint,
-}: {
-  icon: React.ReactNode;
-  name: string;
-  time: string;
-  tint: string;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 py-1.5">
-      <div className={cn("w-7 h-7 rounded-md flex items-center justify-center", tint)}>
-        {icon}
+function ArtifactRow({ f }: { f: ThreadFile }) {
+  const isImage = f.isImage || (f.mime ?? "").startsWith("image/");
+  const isPdf = f.isPdf || (f.mime ?? "").includes("pdf");
+  const isCode = /\.(json|js|ts|tsx|py|html|css)$/i.test(f.name);
+  const { Icon, tint } = isImage
+    ? { Icon: ImageIcon, tint: "bg-violet/10 text-violet" }
+    : isCode
+      ? { Icon: FileCode2, tint: "bg-amber-100 text-amber-700" }
+      : isPdf
+        ? { Icon: FileText, tint: "bg-rose-100 text-rose-700" }
+        : { Icon: FileIcon, tint: "bg-muted text-muted-foreground" };
+  const content = (
+    <div className="flex items-center gap-2 py-1">
+      <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", tint)}>
+        <Icon className="w-3.5 h-3.5" />
       </div>
-      <div className="flex-1 min-w-0 text-sm truncate">{name}</div>
-      <div className="text-[11px] text-muted-foreground">{time}</div>
+      <div className="flex-1 min-w-0 text-[12px] truncate">{f.name}</div>
+      <div className="text-[10px] text-muted-foreground">{f.time ?? ""}</div>
     </div>
+  );
+  return f.url ? (
+    <a href={f.url} target="_blank" rel="noreferrer" className="block hover:bg-accent/40 rounded-md px-1">
+      {content}
+    </a>
+  ) : (
+    <div className="px-1">{content}</div>
   );
 }

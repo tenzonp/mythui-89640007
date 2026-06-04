@@ -37,11 +37,41 @@ import {
   Video as VideoIcon,
   RotateCw,
   UploadCloud,
+  FileCode2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { agents, getAgent } from "@/data/agents";
+import { useChatActivity, type ThreadFile, type ThreadTask } from "@/lib/chat-context";
+
+type TabKey = "chat" | "files" | "tasks" | "notes";
+
+function friendlyToolLabel(name: string): { label: string; icon?: string } {
+  const n = name.toLowerCase();
+  if (n.includes("image") || n.includes("imagegen")) return { label: "Image generation" };
+  if (n.includes("gmail") || n.includes("email") || n.includes("mail"))
+    return { label: "Email" };
+  if (n.includes("instagram")) return { label: "Instagram post" };
+  if (n.includes("twitter") || n.includes("x_post")) return { label: "Twitter post" };
+  if (n.includes("linkedin")) return { label: "LinkedIn post" };
+  if (n.includes("youtube")) return { label: "YouTube" };
+  if (n.includes("notion")) return { label: "Notion doc" };
+  if (n.includes("slack")) return { label: "Slack message" };
+  if (n.includes("calendar")) return { label: "Calendar event" };
+  if (n.includes("sheet") || n.includes("excel")) return { label: "Spreadsheet" };
+  if (n.includes("firecrawl") || n.includes("search") || n.includes("web_fetch") || n.includes("research"))
+    return { label: "Research" };
+  if (n.includes("run_code") || n.includes("e2b")) return { label: "Code execution" };
+  if (n.includes("delegate")) return { label: "Delegate to teammate" };
+  if (n.includes("video")) return { label: "Video generation" };
+  return { label: name.replace(/_/g, " ") };
+}
+
+function timeAgo(d: Date) {
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 export const Route = createFileRoute("/chat/$threadId")({
   component: ChatThread,
@@ -418,6 +448,8 @@ function ChatWindow({
         )
     : conns.filter((c) => c.status === "ACTIVE");
 
+  const [tab, setTab] = useState<TabKey>("chat");
+
   const threadTitle = useMemo(() => {
     const first = messages.find((m) => m.role === "user");
     if (!first) return "New Conversation";
@@ -429,11 +461,108 @@ function ChatWindow({
   }, [messages]);
   void allowedSlugs;
 
+  // Derive Files + Tasks + Employee activity from messages
+  const { files, tasks, working, active, progress } = useMemo(() => {
+    const files: ThreadFile[] = [];
+    const tasks: ThreadTask[] = [];
+    const working = new Set<string>();
+    const active = new Set<string>();
+    let totalTools = 0;
+    let doneTools = 0;
+    for (const m of messages) {
+      for (const p of m.parts as any[]) {
+        // user-attached files
+        if (p.type === "file" && typeof p.url === "string") {
+          files.push({
+            name: p.filename ?? "file",
+            mime: p.mediaType,
+            url: p.url,
+            isImage: (p.mediaType ?? "").startsWith("image/"),
+            isPdf: (p.mediaType ?? "").includes("pdf"),
+          });
+        }
+        // assistant tool calls
+        if (typeof p.type === "string" && p.type.startsWith("tool-")) {
+          totalTools++;
+          const name = p.type.replace(/^tool-/, "");
+          const state = p.state ?? "input-streaming";
+          const queued = p.output?.status === "queued";
+          const blocked = p.output?.status === "blocked" || p.output?.blocker;
+          const isDone = state === "output-available";
+          const isErr = state === "output-error";
+          const tStatus: ThreadTask["status"] = isErr
+            ? "error"
+            : blocked
+              ? "blocked"
+              : queued
+                ? "queued"
+                : isDone
+                  ? "done"
+                  : "running";
+          if (isDone || isErr) doneTools++;
+          // delegation → record agent activity
+          if (name === "delegate_to_employee") {
+            const employeeId: string | undefined =
+              p.output?.employee_id ?? p.input?.employee;
+            if (employeeId) {
+              if (tStatus === "running") working.add(employeeId);
+              else active.add(employeeId);
+            }
+            const sub = employeeId ? getAgent(employeeId) : undefined;
+            tasks.push({
+              id: `${m.id}-${name}-${tasks.length}`,
+              label: `Delegated to ${sub?.name ?? employeeId ?? "teammate"}`,
+              detail: p.input?.task,
+              agentId: employeeId,
+              status: tStatus,
+            });
+          } else {
+            const f = friendlyToolLabel(name);
+            tasks.push({
+              id: `${m.id}-${name}-${tasks.length}`,
+              label: f.label,
+              detail: name,
+              status: tStatus,
+            });
+          }
+          // collect artifacts from tool outputs
+          const arts: any[] = Array.isArray(p.output?.artifacts) ? p.output.artifacts : [];
+          for (const a of arts) {
+            files.push({
+              name: a.name ?? "file",
+              mime: a.mime,
+              size: a.size,
+              url: a.url,
+              isImage: a.isImage || (a.mime ?? "").startsWith("image/"),
+              isPdf: a.isPdf || (a.mime ?? "").includes("pdf"),
+            });
+          }
+        }
+      }
+    }
+    const progress = totalTools === 0 ? (messages.length ? 100 : 0) : Math.round((doneTools / totalTools) * 100);
+    return { files, tasks, working, active, progress };
+  }, [messages]);
+
+  const { setActivity } = useChatActivity();
+  useEffect(() => {
+    setActivity({
+      threadTitle,
+      files,
+      tasks,
+      working,
+      active,
+      progress,
+      running: busy,
+    });
+  }, [threadTitle, files, tasks, working, active, progress, busy, setActivity]);
+
+
   return (
     <>
       <div className="border-b bg-white">
-        <div className="px-8 pt-5 pb-2 flex items-center justify-between gap-3">
-          <h1 className="text-[20px] font-semibold tracking-tight truncate">{threadTitle}</h1>
+        <div className="px-6 pt-3 pb-1.5 flex items-center justify-between gap-3">
+          <h1 className="text-[17px] font-semibold tracking-tight truncate">{threadTitle}</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -443,38 +572,39 @@ function ChatWindow({
                   toast.success("Link copied");
                 }
               }}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border hover:bg-accent"
+              className="inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-lg border hover:bg-accent"
             >
-              <Share2 className="w-4 h-4" /> Share
+              <Share2 className="w-3.5 h-3.5" /> Share
             </button>
             <Link
               to="/integrations"
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border hover:bg-accent text-muted-foreground"
+              className="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg border hover:bg-accent text-muted-foreground"
               title={`${activeCount} integrations connected`}
             >
-              <Plug className="w-3.5 h-3.5" />
+              <Plug className="w-3 h-3" />
               {activeCount}
             </Link>
             <button
-              className="w-8 h-8 rounded-lg border hover:bg-accent inline-flex items-center justify-center text-muted-foreground"
+              className="w-7 h-7 rounded-lg border hover:bg-accent inline-flex items-center justify-center text-muted-foreground text-xs"
               aria-label="More"
             >
               ···
             </button>
           </div>
         </div>
-        <div className="px-8 flex items-center gap-6 text-sm">
-          {[
+        <div className="px-6 flex items-center gap-5 text-[13px]">
+          {([
             { k: "chat", label: "Chat" },
-            { k: "files", label: "Files" },
-            { k: "tasks", label: "Tasks" },
+            { k: "files", label: `Files${files.length ? ` (${files.length})` : ""}` },
+            { k: "tasks", label: `Tasks${tasks.length ? ` (${tasks.length})` : ""}` },
             { k: "notes", label: "Notes" },
-          ].map((t, i) => (
+          ] as { k: TabKey; label: string }[]).map((t) => (
             <button
               key={t.k}
+              onClick={() => setTab(t.k)}
               className={
-                "py-2.5 -mb-px border-b-2 " +
-                (i === 0
+                "py-1.5 -mb-px border-b-2 transition-colors " +
+                (tab === t.k
                   ? "border-violet text-foreground font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground")
               }
@@ -483,7 +613,7 @@ function ChatWindow({
             </button>
           ))}
           <div className="flex-1" />
-          <div className="flex items-center gap-2 py-1.5">
+          <div className="flex items-center gap-2 py-1">
             <img
               src={agent.image}
               alt={agent.name}
@@ -492,7 +622,7 @@ function ChatWindow({
             <select
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
+              className="text-[11px] border rounded-lg px-2 py-1 bg-background hover:bg-accent"
               aria-label="Choose employee"
             >
               <option value="lin">Lin — CEO (auto-routes the team)</option>
@@ -509,36 +639,43 @@ function ChatWindow({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-[760px] mx-auto px-6 py-8 space-y-6">
-          {pendingInstagram.length > 0 && <InstagramPendingBanner pending={pendingInstagram} />}
-          {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
-          {messages.map((m) => (
-            <Message
-              key={m.id}
-              m={m}
-              onDelete={async () => {
-                setMessages((prev) => prev.filter((x) => x.id !== m.id));
-                try {
-                  await fnDeleteMsg({ data: { id: m.id } });
-                } catch {}
-              }}
-            />
-          ))}
-          {busy && messages[messages.length - 1]?.role !== "assistant" && (
-            <div className="text-sm text-muted-foreground flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…
-            </div>
-          )}
-          {error && (
-            <div className="text-sm text-destructive border border-destructive/30 rounded-lg p-3">
-              {error.message}
-            </div>
-          )}
-        </div>
+        {tab === "chat" && (
+          <div className="max-w-[760px] mx-auto px-6 py-5 space-y-5">
+            {pendingInstagram.length > 0 && <InstagramPendingBanner pending={pendingInstagram} />}
+            {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
+            {messages.map((m) => (
+              <Message
+                key={m.id}
+                m={m}
+                onDelete={async () => {
+                  setMessages((prev) => prev.filter((x) => x.id !== m.id));
+                  try {
+                    await fnDeleteMsg({ data: { id: m.id } });
+                  } catch {}
+                }}
+              />
+            ))}
+            {busy && messages[messages.length - 1]?.role !== "assistant" && (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…
+              </div>
+            )}
+            {error && (
+              <div className="text-sm text-destructive border border-destructive/30 rounded-lg p-3">
+                {error.message}
+              </div>
+            )}
+          </div>
+        )}
+        {tab === "files" && <FilesPane files={files} />}
+        {tab === "tasks" && <TasksPane tasks={tasks} />}
+        {tab === "notes" && <NotesPane />}
       </div>
 
+
       <div className="border-t bg-background">
-        <div className="max-w-[760px] mx-auto p-4">
+        <div className="max-w-[760px] mx-auto px-4 py-3">
+
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
@@ -687,7 +824,142 @@ function ChatWindow({
   );
 }
 
+function FilesPane({ files }: { files: ThreadFile[] }) {
+  if (!files.length) {
+    return (
+      <div className="max-w-[760px] mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
+        No files yet. Attach a file or ask the team to generate one.
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-[760px] mx-auto px-6 py-5">
+      <div className="grid sm:grid-cols-2 gap-2">
+        {files.map((f, i) => {
+          const isImage = f.isImage;
+          const isPdf = f.isPdf;
+          const isCode = /\.(json|js|ts|tsx|py|html|css)$/i.test(f.name);
+          return (
+            <a
+              key={i}
+              href={f.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent/40 transition-colors"
+            >
+              {isImage && f.url ? (
+                <img
+                  src={f.url}
+                  alt={f.name}
+                  className="w-10 h-10 rounded-lg object-cover border"
+                />
+              ) : (
+                <div
+                  className={
+                    "w-10 h-10 rounded-lg flex items-center justify-center " +
+                    (isPdf
+                      ? "bg-rose-100 text-rose-700"
+                      : isCode
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-primary/10 text-primary")
+                  }
+                >
+                  {isPdf ? (
+                    <FileText className="w-5 h-5" />
+                  ) : isCode ? (
+                    <FileCode2 className="w-5 h-5" />
+                  ) : (
+                    <FileIcon className="w-5 h-5" />
+                  )}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium truncate">{f.name}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {[(f.mime ?? "").split("/").pop()?.toUpperCase(), bytesLabel(f.size)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
+              <Download className="w-4 h-4 text-muted-foreground" />
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TasksPane({ tasks }: { tasks: ThreadTask[] }) {
+  if (!tasks.length) {
+    return (
+      <div className="max-w-[760px] mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
+        No tasks yet. Ask the team to research, draft, generate or post — tasks will show up here.
+      </div>
+    );
+  }
+  const dotFor = (s: ThreadTask["status"]) =>
+    s === "running"
+      ? "bg-amber-500 animate-pulse"
+      : s === "done"
+        ? "bg-emerald-500"
+        : s === "queued"
+          ? "bg-amber-400"
+          : s === "blocked"
+            ? "bg-rose-500"
+            : "bg-rose-600";
+  const labelFor = (s: ThreadTask["status"]) =>
+    s === "running"
+      ? "Working"
+      : s === "done"
+        ? "Done"
+        : s === "queued"
+          ? "Queued"
+          : s === "blocked"
+            ? "Blocked"
+            : "Error";
+  return (
+    <div className="max-w-[760px] mx-auto px-6 py-5">
+      <ul className="divide-y border rounded-xl bg-background overflow-hidden">
+        {tasks.map((t) => {
+          const sub = t.agentId ? getAgent(t.agentId) : undefined;
+          return (
+            <li key={t.id} className="flex items-center gap-3 px-3 py-2.5">
+              {sub ? (
+                <img src={sub.image} alt={sub.name} className="w-7 h-7 rounded-full object-cover" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Wrench className="w-3.5 h-3.5" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium truncate">{t.label}</div>
+                {t.detail && (
+                  <div className="text-[11px] text-muted-foreground truncate">{t.detail}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
+                <span className={cn("w-1.5 h-1.5 rounded-full", dotFor(t.status))} />
+                {labelFor(t.status)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function NotesPane() {
+  return (
+    <div className="max-w-[760px] mx-auto px-6 py-10 text-center text-sm text-muted-foreground">
+      Notes coming soon. Pin key takeaways from this conversation here.
+    </div>
+  );
+}
+
 function EmptyState({ onPick }: { onPick: (t: string) => void }) {
+
   const suggestions = [
     "Draft a friendly cold outreach email to a SaaS founder",
     "Summarize the latest unread emails in my inbox",
