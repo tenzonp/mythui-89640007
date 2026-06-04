@@ -1,9 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { motion, AnimatePresence } from "framer-motion";
-import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +60,14 @@ const FLOW: StepId[] = [
 
 const TONES = ["warm", "expert", "playful", "premium", "bold", "calm", "witty", "minimal"];
 const INDUSTRIES = ["SaaS", "E-commerce", "Coffee / F&B", "Agency", "Creator", "Health", "Education", "Other"];
+const ORBS = [
+  { id: 0, x: 8, y: 12, s: 190, d: 10 },
+  { id: 1, x: 78, y: 18, s: 260, d: 13 },
+  { id: 2, x: 24, y: 68, s: 145, d: 11 },
+  { id: 3, x: 64, y: 72, s: 230, d: 14 },
+  { id: 4, x: 46, y: 28, s: 120, d: 9 },
+  { id: 5, x: 88, y: 58, s: 165, d: 12 },
+];
 
 function OnboardingPage() {
   const nav = useNavigate();
@@ -88,6 +94,7 @@ function OnboardingPage() {
 
   const finish = async () => {
     try { await saveProfile({ data: { complete: true } }); } catch {}
+    const confetti = (await import("canvas-confetti")).default;
     confetti({ particleCount: 180, spread: 90, origin: { y: 0.6 }, colors: ["#7c3aed", "#a78bfa", "#fde68a", "#34d399"] });
     setTimeout(() => confetti({ particleCount: 120, angle: 60, spread: 70, origin: { x: 0 } }), 200);
     setTimeout(() => confetti({ particleCount: 120, angle: 120, spread: 70, origin: { x: 1 } }), 400);
@@ -111,11 +118,9 @@ function OnboardingPage() {
       {/* Progress neuron bar */}
       <div className="relative z-10 px-6">
         <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-          <motion.div
+          <div
             className="h-full bg-gradient-to-r from-violet-500 via-fuchsia-400 to-amber-300"
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ type: "spring", damping: 25, stiffness: 120 }}
+            style={{ width: `${pct}%`, transition: "width 500ms cubic-bezier(0.22, 1, 0.36, 1)" }}
           />
         </div>
         <div className="mt-1.5 flex justify-between text-[10px] uppercase tracking-widest text-white/30">
@@ -126,14 +131,7 @@ function OnboardingPage() {
 
       {/* Stage */}
       <div className="relative z-10 max-w-2xl mx-auto px-6 pt-10 pb-24 min-h-[70vh]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, y: 30, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -30, filter: "blur(8px)" }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          >
+        <div key={step} className="animate-in fade-in-0 slide-in-from-bottom-6 duration-500">
             {step === "intro" && <IntroScreen onStart={next} />}
 
             {step === "name" && (
@@ -263,8 +261,7 @@ function OnboardingPage() {
             )}
 
             {step === "done" && <DoneScreen onGoChat={() => nav({ to: "/chat" })} onGoKnowledge={() => nav({ to: "/knowledge" })} />}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   );
@@ -285,28 +282,20 @@ function BackdropFX() {
 }
 
 function FloatingOrbs() {
-  const orbs = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    s: 100 + Math.random() * 240,
-    d: 6 + Math.random() * 8,
-  })), []);
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {orbs.map((o) => (
-        <motion.div
+      {ORBS.map((o) => (
+        <div
           key={o.id}
-          className="absolute rounded-full blur-3xl"
+          className="absolute rounded-full blur-3xl animate-pulse"
           style={{
             left: `${o.x}%`,
             top: `${o.y}%`,
             width: o.s,
             height: o.s,
             background: o.id % 2 ? "rgba(167,139,250,0.18)" : "rgba(244,114,182,0.14)",
+            animationDuration: `${o.d}s`,
           }}
-          animate={{ x: [0, 40, -20, 0], y: [0, -30, 20, 0] }}
-          transition={{ duration: o.d, repeat: Infinity, ease: "easeInOut" }}
         />
       ))}
     </div>
@@ -405,18 +394,17 @@ function ChipPicker({ kicker, label, options, value, onChange, onBack, onNext, m
         {options.map((o: string) => {
           const on = selected.includes(o);
           return (
-            <motion.button
+            <button
               key={o}
-              whileTap={{ scale: 0.95 }}
               onClick={() => toggle(o)}
-              className={`px-4 py-2.5 rounded-full text-sm border transition-all ${
+              className={`px-4 py-2.5 rounded-full text-sm border transition-all active:scale-95 ${
                 on
                   ? "bg-gradient-to-r from-violet-500 to-fuchsia-500 border-transparent text-white shadow-[0_0_25px_-5px_rgba(168,85,247,0.7)]"
                   : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >
               {o}
-            </motion.button>
+            </button>
           );
         })}
       </div>
@@ -471,8 +459,8 @@ function TeamStage({ team, onChanged, onBack, onNext }: any) {
       {team.length > 0 && (
         <div className="mt-4 grid gap-2">
           {team.map((t: any) => (
-            <motion.div key={t.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+            <div key={t.id}
+              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10 animate-in fade-in-0 slide-in-from-left-2 duration-300">
               <div className="text-sm">
                 <div className="font-medium text-white">{t.name} <span className="text-white/40 font-normal">· {t.role}</span></div>
                 <div className="text-xs text-white/40">{[t.email, t.phone].filter(Boolean).join(" · ")}</div>
@@ -480,7 +468,7 @@ function TeamStage({ team, onChanged, onBack, onNext }: any) {
               <button onClick={async () => { await delFn({ data: { id: t.id } }); onChanged(); }} className="text-white/40 hover:text-rose-400">
                 <Trash2 className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
@@ -528,8 +516,8 @@ function AccountsStage({ accounts, onChanged, onBack, onNext }: any) {
       {accounts.length > 0 && (
         <div className="mt-4 grid gap-2">
           {accounts.map((x: any) => (
-            <motion.div key={x.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10">
+            <div key={x.id}
+              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/10 animate-in fade-in-0 slide-in-from-left-2 duration-300">
               <div className="text-sm">
                 <div className="font-mono text-[10px] uppercase tracking-widest text-fuchsia-300/80">{x.kind}</div>
                 <div className="text-white">{[x.handle, x.url].filter(Boolean).join(" · ")}</div>
@@ -537,7 +525,7 @@ function AccountsStage({ accounts, onChanged, onBack, onNext }: any) {
               <button onClick={async () => { await delFn({ data: { id: x.id } }); onChanged(); }} className="text-white/40 hover:text-rose-400">
                 <Trash2 className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
@@ -612,14 +600,11 @@ function FieldInput({ value, onChange, placeholder }: any) {
 function IntroScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="text-center pt-10">
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", damping: 12 }}
-        className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 flex items-center justify-center shadow-[0_0_60px_-10px_rgba(168,85,247,0.8)]"
+      <div
+        className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 flex items-center justify-center shadow-[0_0_60px_-10px_rgba(168,85,247,0.8)] animate-in zoom-in-50 fade-in-0 duration-500"
       >
         <Brain className="w-10 h-10 text-white" />
-      </motion.div>
+      </div>
       <h1 className="mt-8 text-4xl md:text-6xl font-serif leading-[1.05] tracking-tight">
         Let's <em className="italic bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">hack</em><br />
         Wynsa's brain with <em className="italic bg-gradient-to-r from-amber-200 to-fuchsia-300 bg-clip-text text-transparent">your business.</em>
@@ -639,13 +624,11 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 function DoneScreen({ onGoChat, onGoKnowledge }: any) {
   return (
     <div className="text-center pt-10">
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: "spring", damping: 10 }}
-        className="mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-violet-500 flex items-center justify-center shadow-[0_0_80px_-10px_rgba(52,211,153,0.6)]"
+      <div
+        className="mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-violet-500 flex items-center justify-center shadow-[0_0_80px_-10px_rgba(52,211,153,0.6)] animate-in zoom-in-50 spin-in-45 fade-in-0 duration-500"
       >
         <Check className="w-12 h-12 text-white" strokeWidth={3} />
-      </motion.div>
+      </div>
       <h1 className="mt-8 text-4xl md:text-6xl font-serif">
         Wynsa is <em className="italic bg-gradient-to-r from-emerald-300 to-violet-300 bg-clip-text text-transparent">awake.</em>
       </h1>
