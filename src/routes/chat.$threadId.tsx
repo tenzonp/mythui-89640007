@@ -150,7 +150,15 @@ function ChatWindow({
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<
-    { name: string; url: string; mime: string; size: number; isImage: boolean }[]
+    {
+      name: string;
+      url: string;
+      mime: string;
+      size: number;
+      isImage: boolean;
+      isPdf?: boolean;
+      pageCount?: number;
+    }[]
   >([]);
   const [uploading, setUploading] = useState(false);
   const fnUpload = useServerFn(uploadAttachment);
@@ -205,14 +213,25 @@ function ChatWindow({
     const text = input.trim();
     if ((!text && attachments.length === 0) || status === "submitted" || status === "streaming")
       return;
-    const atts = attachments;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const atts = attachments.map((a) => ({
+      ...a,
+      url: a.url.startsWith("http") ? a.url : `${origin}${a.url}`,
+    }));
     const attLines = atts.length
       ? "\n\n📎 Attached files (use run_code with `requests` to download/inspect, or web_fetch for text URLs):\n" +
-        atts.map((a) => `- ${a.name} (${a.mime}) — ${a.url}`).join("\n")
+        atts
+          .map(
+            (a) =>
+              `- ${a.name} (${a.mime}${a.pageCount ? `, ${a.pageCount} pages` : ""}) — ${a.url}`,
+          )
+          .join("\n")
       : "";
     const parts: any[] = [{ type: "text", text: (text || "(see attached files)") + attLines }];
     for (const a of atts) {
       if (a.isImage) {
+        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
+      } else {
         parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
       }
     }
@@ -317,27 +336,48 @@ function ChatWindow({
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
-                {attachments.map((a, i) => (
-                  <div
-                    key={i}
-                    className="group relative flex items-center gap-2 border rounded-lg px-2 py-1.5 text-xs bg-muted/40"
-                  >
-                    {a.isImage ? (
-                      <img src={a.url} alt={a.name} className="w-8 h-8 rounded object-cover" />
-                    ) : (
-                      <FileIcon className="w-4 h-4 text-muted-foreground" />
-                    )}
-                    <span className="max-w-[160px] truncate">{a.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))}
-                      className="opacity-60 hover:opacity-100"
-                      aria-label="Remove"
+                {attachments.map((a, i) => {
+                  const ext = (a.mime ?? "").split("/").pop()?.toUpperCase();
+                  const meta = [
+                    ext,
+                    a.pageCount ? `${a.pageCount}p` : null,
+                    bytesLabel(a.size),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <div
+                      key={i}
+                      className="group relative flex items-center gap-2 border rounded-lg pl-1.5 pr-2 py-1 text-xs bg-muted/40"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                      {a.isImage ? (
+                        <img
+                          src={a.url}
+                          alt={a.name}
+                          className="w-8 h-8 rounded object-cover"
+                        />
+                      ) : a.isPdf ? (
+                        <FileText className="w-4 h-4 text-muted-foreground mx-1" />
+                      ) : (
+                        <FileIcon className="w-4 h-4 text-muted-foreground mx-1" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="max-w-[160px] truncate">{a.name}</div>
+                        <div className="text-[10px] text-muted-foreground">{meta}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAttachments((p) => p.filter((_, j) => j !== i))
+                        }
+                        className="opacity-60 hover:opacity-100"
+                        aria-label="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <textarea
@@ -448,37 +488,192 @@ function InstagramPendingBanner({ pending }: { pending: any[] }) {
   );
 }
 
-function renderFileParts(parts: any[]) {
-  const files = parts.filter(
-    (p) => p.type === "file" && typeof p.url === "string",
-  );
+function bytesLabel(n?: number) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function FileGrid({
+  files,
+  align = "start",
+}: {
+  files: any[];
+  align?: "start" | "end";
+}) {
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   if (!files.length) return null;
+  const images = files.filter((f) => (f.mediaType ?? f.mime ?? "").startsWith("image/"));
+  const others = files.filter((f) => !(f.mediaType ?? f.mime ?? "").startsWith("image/"));
+  const justify = align === "end" ? "justify-end" : "justify-start";
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {files.map((f, i) =>
-        (f.mediaType ?? "").startsWith("image/") ? (
-          <a key={i} href={f.url} target="_blank" rel="noreferrer">
-            <img
-              src={f.url}
-              alt={f.filename ?? "image"}
-              className="max-h-48 rounded-lg border object-cover"
-            />
-          </a>
-        ) : (
-          <a
-            key={i}
-            href={f.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-xs bg-muted/30 hover:bg-accent"
-          >
-            <FileIcon className="w-4 h-4" />
-            <span className="max-w-[200px] truncate">{f.filename ?? "file"}</span>
-          </a>
-        ),
+    <div className={`flex flex-col gap-2 ${align === "end" ? "items-end" : "items-start"} max-w-full`}>
+      {images.length > 0 && (
+        <div
+          className={`grid gap-1.5 ${justify} ${
+            images.length === 1
+              ? "grid-cols-1"
+              : images.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-3"
+          }`}
+          style={{ maxWidth: 360 }}
+        >
+          {images.map((f, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setLightboxIdx(i)}
+              className="block overflow-hidden rounded-lg border bg-muted/30 hover:opacity-90 transition"
+            >
+              <img
+                src={f.url}
+                alt={f.filename ?? f.name ?? "image"}
+                className={`object-cover ${
+                  images.length === 1 ? "max-h-72 w-auto" : "h-28 w-28"
+                }`}
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+      {others.length > 0 && (
+        <div className={`grid sm:grid-cols-2 gap-2 w-full max-w-[480px]`}>
+          {others.map((f, i) => (
+            <FileChip key={i} f={f} />
+          ))}
+        </div>
+      )}
+      {lightboxIdx !== null && (
+        <Lightbox
+          images={images}
+          index={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+          onIndex={setLightboxIdx}
+        />
       )}
     </div>
   );
+}
+
+function FileChip({ f }: { f: any }) {
+  const mime = f.mediaType ?? f.mime ?? "";
+  const name = f.filename ?? f.name ?? "file";
+  const isPdf = mime.includes("pdf") || name.toLowerCase().endsWith(".pdf");
+  const size = bytesLabel(f.size);
+  const meta = [
+    mime.split("/").pop()?.toUpperCase(),
+    f.pageCount ? `${f.pageCount} page${f.pageCount === 1 ? "" : "s"}` : null,
+    size,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <a
+      href={`${f.url}${f.url.includes("?") ? "&" : "?"}download=1&name=${encodeURIComponent(name)}`}
+      className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent transition-colors group/card"
+    >
+      <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        {isPdf ? <FileText className="w-5 h-5" /> : <FileIcon className="w-5 h-5" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate">{name}</div>
+        <div className="text-[11px] text-muted-foreground truncate">{meta || mime}</div>
+      </div>
+      <Download className="w-4 h-4 text-muted-foreground group-hover/card:text-foreground" />
+    </a>
+  );
+}
+
+function Lightbox({
+  images,
+  index,
+  onClose,
+  onIndex,
+}: {
+  images: any[];
+  index: number;
+  onClose: () => void;
+  onIndex: (i: number) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") onIndex((index + 1) % images.length);
+      if (e.key === "ArrowLeft") onIndex((index - 1 + images.length) % images.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, images.length]);
+  const img = images[index];
+  if (!img) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <a
+        href={`${img.url}${img.url.includes("?") ? "&" : "?"}download=1&name=${encodeURIComponent(img.filename ?? img.name ?? "image")}`}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-4 right-16 text-white/80 hover:text-white p-2"
+        aria-label="Download"
+      >
+        <Download className="w-5 h-5" />
+      </a>
+      <img
+        src={img.url}
+        alt={img.filename ?? "image"}
+        className="max-h-[90vh] max-w-[92vw] object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndex((index - 1 + images.length) % images.length);
+            }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-3 rounded-full bg-white/10"
+            aria-label="Previous"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndex((index + 1) % images.length);
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-3 rounded-full bg-white/10"
+            aria-label="Next"
+          >
+            ›
+          </button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-xs">
+            {index + 1} / {images.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function renderFileParts(parts: any[]) {
+  const files = parts.filter((p) => p.type === "file" && typeof p.url === "string");
+  if (!files.length) return null;
+  return <FileGrid files={files} align="end" />;
 }
 
 function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
@@ -614,34 +809,55 @@ function ToolCall({ part }: { part: any }) {
 }
 
 function ArtifactCard({ a }: { a: any }) {
-  const isImage = (a.mime ?? "").startsWith("image/");
-  const isPdf = (a.mime ?? "").includes("pdf");
-  const sizeKb = a.size ? `${(a.size / 1024).toFixed(1)} KB` : "";
+  const isImage = (a.mime ?? "").startsWith("image/") || a.isImage;
+  const isPdf = (a.mime ?? "").includes("pdf") || a.isPdf;
+  const [open, setOpen] = useState(false);
+  const downloadHref = `${a.url}${a.url.includes("?") ? "&" : "?"}download=1&name=${encodeURIComponent(a.name)}`;
+  const meta = [
+    (a.mime ?? "").split("/").pop()?.toUpperCase(),
+    a.pageCount ? `${a.pageCount} page${a.pageCount === 1 ? "" : "s"}` : null,
+    bytesLabel(a.size),
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <a
-      href={a.url}
-      target="_blank"
-      rel="noreferrer"
-      download={a.name}
-      className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent transition-colors group/card"
-    >
-      <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+    <>
+      <div className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent/40 transition-colors">
         {isImage ? (
-          <ImageIcon className="w-5 h-5" />
-        ) : isPdf ? (
-          <FileText className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="w-12 h-12 rounded-lg overflow-hidden border shrink-0"
+          >
+            <img src={a.url} alt={a.name} className="w-full h-full object-cover" />
+          </button>
         ) : (
-          <FileIcon className="w-5 h-5" />
+          <div className="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            {isPdf ? <FileText className="w-5 h-5" /> : <FileIcon className="w-5 h-5" />}
+          </div>
         )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium truncate">{a.name}</div>
-        <div className="text-[11px] text-muted-foreground">
-          {a.mime} {sizeKb && `· ${sizeKb}`}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate">{a.name}</div>
+          <div className="text-[11px] text-muted-foreground truncate">{meta}</div>
+          {a.employeeName && (
+            <div className="text-[10px] text-muted-foreground/80 mt-0.5">
+              Generated by {a.employeeName}
+            </div>
+          )}
         </div>
+        <a
+          href={downloadHref}
+          className="inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
+          aria-label="Download"
+          title="Download"
+        >
+          <Download className="w-4 h-4" />
+        </a>
       </div>
-      <Download className="w-4 h-4 text-muted-foreground group-hover/card:text-foreground" />
-    </a>
+      {open && isImage && (
+        <Lightbox images={[a]} index={0} onClose={() => setOpen(false)} onIndex={() => {}} />
+      )}
+    </>
   );
 }
 

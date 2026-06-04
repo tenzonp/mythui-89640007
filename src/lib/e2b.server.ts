@@ -9,14 +9,18 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const BUCKET = "artifacts";
 const OUT_DIR = "/home/user/out";
-const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
 export type Artifact = {
   name: string;
   path: string; // path inside the bucket
-  url: string; // signed URL
+  url: string; // proxy URL (/api/files/...)
   size: number;
   mime: string;
+  pageCount?: number;
+  isImage?: boolean;
+  isPdf?: boolean;
+  employeeId?: string;
+  employeeName?: string;
 };
 
 export type RunCodeResult = {
@@ -64,11 +68,18 @@ async function uploadArtifact(
     .from(BUCKET)
     .upload(path, bytes, { contentType: mime, upsert: false });
   if (error) throw new Error(`Upload failed for ${fileName}: ${error.message}`);
-  const { data: signed, error: signErr } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .createSignedUrl(path, SIGNED_TTL);
-  if (signErr) throw new Error(`Sign failed for ${fileName}: ${signErr.message}`);
-  return { name: safe, path, url: signed.signedUrl, size: bytes.byteLength, mime };
+  const isImage = mime.startsWith("image/");
+  const isPdf = mime.includes("pdf");
+  let pageCount: number | undefined;
+  if (isPdf) {
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+      pageCount = doc.getPageCount();
+    } catch {}
+  }
+  const url = `/api/files/${encodeURIComponent(path)}`;
+  return { name: safe, path, url, size: bytes.byteLength, mime, isImage, isPdf, pageCount };
 }
 
 export async function runCode(opts: {
@@ -76,6 +87,8 @@ export async function runCode(opts: {
   code: string;
   language?: "python" | "javascript";
   timeoutMs?: number;
+  employeeId?: string;
+  employeeName?: string;
 }): Promise<RunCodeResult> {
   const apiKey = process.env.E2B_API_KEY;
   if (!apiKey) throw new Error("E2B_API_KEY not configured");
@@ -144,6 +157,8 @@ export async function runCode(opts: {
         const bytes = await sandbox.files.read(`${OUT_DIR}/${rel}`, { format: "bytes" });
         const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer);
         const art = await uploadArtifact(opts.userId, rel, u8);
+        art.employeeId = opts.employeeId;
+        art.employeeName = opts.employeeName;
         artifacts.push(art);
       } catch (e) {
         console.error("[e2b] artifact read/upload failed:", rel, e);

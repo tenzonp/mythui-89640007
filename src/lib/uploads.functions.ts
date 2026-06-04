@@ -3,7 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const BUCKET = "artifacts";
-const SIGNED_TTL = 60 * 60 * 24 * 7;
 
 function guessMime(name: string): string {
   const n = name.toLowerCase();
@@ -25,6 +24,20 @@ function guessMime(name: string): string {
   return "application/octet-stream";
 }
 
+async function readPdfMeta(bytes: Uint8Array) {
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    return {
+      pageCount: doc.getPageCount(),
+      title: doc.getTitle() || undefined,
+      author: doc.getAuthor() || undefined,
+    };
+  } catch {
+    return { pageCount: undefined as number | undefined };
+  }
+}
+
 export const uploadAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { name: string; dataBase64: string; mime?: string }) => d)
@@ -40,15 +53,22 @@ export const uploadAttachment = createServerFn({ method: "POST" })
       .from(BUCKET)
       .upload(path, bytes, { contentType: mime, upsert: false });
     if (error) throw new Error(error.message);
-    const { data: signed, error: signErr } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .createSignedUrl(path, SIGNED_TTL);
-    if (signErr) throw new Error(signErr.message);
+
+    const isImage = mime.startsWith("image/");
+    const isPdf = mime.includes("pdf");
+    const pdfMeta = isPdf ? await readPdfMeta(bytes) : { pageCount: undefined };
+
+    const url = `/api/files/${encodeURIComponent(path)}`;
     return {
       name: safe,
-      url: signed.signedUrl,
+      path,
+      url,
       mime,
       size: bytes.byteLength,
-      isImage: mime.startsWith("image/"),
+      isImage,
+      isPdf,
+      pageCount: pdfMeta.pageCount,
+      title: (pdfMeta as any).title,
+      author: (pdfMeta as any).author,
     };
   });
