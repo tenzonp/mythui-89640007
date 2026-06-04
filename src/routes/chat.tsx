@@ -186,28 +186,22 @@ function ChatLayoutInner() {
         </div>
         <div className="border-t px-2 py-1.5 space-y-0.5">
           <Link
-            to="/ai-employees"
-            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
-          >
-            <Users className="w-4 h-4" /> AI Employees
-          </Link>
-          <Link
-            to="/integrations"
-            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
-          >
-            <Zap className="w-4 h-4" /> Automations
-          </Link>
-          <Link
             to="/resources"
             className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
           >
             <BookOpen className="w-4 h-4" /> Knowledge Base
           </Link>
           <Link
+            to="/billing"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
+          >
+            <Zap className="w-4 h-4" /> Plan & Billing
+          </Link>
+          <Link
             to="/profile"
             className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-foreground/80 hover:bg-accent"
           >
-            <SettingsIcon className="w-4 h-4" /> Profile & Billing
+            <SettingsIcon className="w-4 h-4" /> Profile
           </Link>
         </div>
         <div className="border-t p-2 relative">
@@ -379,10 +373,20 @@ function ArtifactRow({ f }: { f: ThreadFile }) {
 
 function CreditsCard() {
   const fetchPlan = useServerFn(getMyPlan);
+  const { activity } = useChatActivity();
   const [plan, setPlan] = useState<any>(null);
+  const load = () => fetchPlan().then(setPlan).catch(() => {});
   useEffect(() => {
-    fetchPlan().then(setPlan).catch(() => {});
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
   }, []);
+  const workingCount = activity.working.size;
+  const prevWorking = useRef(workingCount);
+  useEffect(() => {
+    if (prevWorking.current > 0 && workingCount === 0) load();
+    prevWorking.current = workingCount;
+  }, [workingCount]);
   if (!plan) return null;
   const max =
     plan.tier === "free" ? plan.dailyFreeCredits : plan.monthlyCredits;
@@ -390,7 +394,10 @@ function CreditsCard() {
   return (
     <div className="bg-white rounded-xl border p-3">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[13px] font-semibold">Credits</div>
+        <div className="text-[13px] font-semibold flex items-center gap-1.5">
+          Credits
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Live" />
+        </div>
         <span className="text-[10.5px] uppercase tracking-wider text-violet font-medium">
           {plan.planName}
         </span>
