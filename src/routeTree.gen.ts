@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as SolutionsRouteImport } from './routes/solutions'
+import { Route as SitesRouteImport } from './routes/sites'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -24,6 +26,9 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as AiEmployeesIndexRouteImport } from './routes/ai-employees.index'
+import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
+import { Route as SitesSiteIdRouteImport } from './routes/sites.$siteId'
+import { Route as GrowAdminRouteImport } from './routes/grow.admin'
 import { Route as ChatThreadIdRouteImport } from './routes/chat.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AiEmployeesAgentIdRouteImport } from './routes/ai-employees.$agentId'
@@ -36,9 +41,19 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SolutionsRoute = SolutionsRouteImport.update({
   id: '/solutions',
   path: '/solutions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitesRoute = SitesRouteImport.update({
+  id: '/sites',
+  path: '/sites',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResourcesRoute = ResourcesRouteImport.update({
@@ -106,6 +121,21 @@ const AiEmployeesIndexRoute = AiEmployeesIndexRouteImport.update({
   path: '/ai-employees/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => SupportRoute,
+} as any)
+const SitesSiteIdRoute = SitesSiteIdRouteImport.update({
+  id: '/$siteId',
+  path: '/$siteId',
+  getParentRoute: () => SitesRoute,
+} as any)
+const GrowAdminRoute = GrowAdminRouteImport.update({
+  id: '/grow/admin',
+  path: '/grow/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatThreadIdRoute = ChatThreadIdRouteImport.update({
   id: '/$threadId',
   path: '/$threadId',
@@ -150,11 +180,16 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
+  '/sites': typeof SitesRouteWithChildren
   '/solutions': typeof SolutionsRoute
+  '/support': typeof SupportRouteWithChildren
   '/terms': typeof TermsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
+  '/grow/admin': typeof GrowAdminRoute
+  '/sites/$siteId': typeof SitesSiteIdRoute
+  '/support/$ticketId': typeof SupportTicketIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
@@ -172,11 +207,16 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
+  '/sites': typeof SitesRouteWithChildren
   '/solutions': typeof SolutionsRoute
+  '/support': typeof SupportRouteWithChildren
   '/terms': typeof TermsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
+  '/grow/admin': typeof GrowAdminRoute
+  '/sites/$siteId': typeof SitesSiteIdRoute
+  '/support/$ticketId': typeof SupportTicketIdRoute
   '/ai-employees': typeof AiEmployeesIndexRoute
   '/chat': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
@@ -196,11 +236,16 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
+  '/sites': typeof SitesRouteWithChildren
   '/solutions': typeof SolutionsRoute
+  '/support': typeof SupportRouteWithChildren
   '/terms': typeof TermsRoute
   '/ai-employees/$agentId': typeof AiEmployeesAgentIdRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
+  '/grow/admin': typeof GrowAdminRoute
+  '/sites/$siteId': typeof SitesSiteIdRoute
+  '/support/$ticketId': typeof SupportTicketIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
@@ -221,11 +266,16 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/resources'
+    | '/sites'
     | '/solutions'
+    | '/support'
     | '/terms'
     | '/ai-employees/$agentId'
     | '/api/chat'
     | '/chat/$threadId'
+    | '/grow/admin'
+    | '/sites/$siteId'
+    | '/support/$ticketId'
     | '/ai-employees/'
     | '/chat/'
     | '/api/files/$'
@@ -243,11 +293,16 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/resources'
+    | '/sites'
     | '/solutions'
+    | '/support'
     | '/terms'
     | '/ai-employees/$agentId'
     | '/api/chat'
     | '/chat/$threadId'
+    | '/grow/admin'
+    | '/sites/$siteId'
+    | '/support/$ticketId'
     | '/ai-employees'
     | '/chat'
     | '/api/files/$'
@@ -266,11 +321,16 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/resources'
+    | '/sites'
     | '/solutions'
+    | '/support'
     | '/terms'
     | '/ai-employees/$agentId'
     | '/api/chat'
     | '/chat/$threadId'
+    | '/grow/admin'
+    | '/sites/$siteId'
+    | '/support/$ticketId'
     | '/ai-employees/'
     | '/chat/'
     | '/api/files/$'
@@ -290,10 +350,13 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
+  SitesRoute: typeof SitesRouteWithChildren
   SolutionsRoute: typeof SolutionsRoute
+  SupportRoute: typeof SupportRouteWithChildren
   TermsRoute: typeof TermsRoute
   AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
   ApiChatRoute: typeof ApiChatRoute
+  GrowAdminRoute: typeof GrowAdminRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
   ApiFilesSplatRoute: typeof ApiFilesSplatRoute
   ApiPublicDodoWebhookRoute: typeof ApiPublicDodoWebhookRoute
@@ -309,11 +372,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/solutions': {
       id: '/solutions'
       path: '/solutions'
       fullPath: '/solutions'
       preLoaderRoute: typeof SolutionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sites': {
+      id: '/sites'
+      path: '/sites'
+      fullPath: '/sites'
+      preLoaderRoute: typeof SitesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/resources': {
@@ -407,6 +484,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiEmployeesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/support/$ticketId': {
+      id: '/support/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/support/$ticketId'
+      preLoaderRoute: typeof SupportTicketIdRouteImport
+      parentRoute: typeof SupportRoute
+    }
+    '/sites/$siteId': {
+      id: '/sites/$siteId'
+      path: '/$siteId'
+      fullPath: '/sites/$siteId'
+      preLoaderRoute: typeof SitesSiteIdRouteImport
+      parentRoute: typeof SitesRoute
+    }
+    '/grow/admin': {
+      id: '/grow/admin'
+      path: '/grow/admin'
+      fullPath: '/grow/admin'
+      preLoaderRoute: typeof GrowAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chat/$threadId': {
       id: '/chat/$threadId'
       path: '/$threadId'
@@ -464,6 +562,27 @@ const ChatRouteChildren: ChatRouteChildren = {
 
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
+interface SitesRouteChildren {
+  SitesSiteIdRoute: typeof SitesSiteIdRoute
+}
+
+const SitesRouteChildren: SitesRouteChildren = {
+  SitesSiteIdRoute: SitesSiteIdRoute,
+}
+
+const SitesRouteWithChildren = SitesRoute._addFileChildren(SitesRouteChildren)
+
+interface SupportRouteChildren {
+  SupportTicketIdRoute: typeof SupportTicketIdRoute
+}
+
+const SupportRouteChildren: SupportRouteChildren = {
+  SupportTicketIdRoute: SupportTicketIdRoute,
+}
+
+const SupportRouteWithChildren =
+  SupportRoute._addFileChildren(SupportRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -476,10 +595,13 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,
+  SitesRoute: SitesRouteWithChildren,
   SolutionsRoute: SolutionsRoute,
+  SupportRoute: SupportRouteWithChildren,
   TermsRoute: TermsRoute,
   AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,
   ApiChatRoute: ApiChatRoute,
+  GrowAdminRoute: GrowAdminRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
   ApiFilesSplatRoute: ApiFilesSplatRoute,
   ApiPublicDodoWebhookRoute: ApiPublicDodoWebhookRoute,
@@ -488,3 +610,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

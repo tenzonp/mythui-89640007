@@ -98,9 +98,14 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return (
-    <footer className="max-w-[1240px] mx-auto px-8 py-12 text-xs text-muted-foreground flex justify-between">
-      <div>© 2026 Mythmind</div>
-      <div>AI Workforce OS</div>
+    <footer className="max-w-[1240px] mx-auto px-8 py-12 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-4">
+      <div>© 2026 Iscilla Technologies · Mythmind</div>
+      <div className="flex items-center gap-4">
+        <Link to="/sites" className="hover:text-violet">Websites</Link>
+        <Link to="/support" className="hover:text-violet">Support</Link>
+        <Link to="/terms" className="hover:text-violet">Terms</Link>
+        <Link to="/privacy" className="hover:text-violet">Privacy</Link>
+      </div>
     </footer>
   );
 }
