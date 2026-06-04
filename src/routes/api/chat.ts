@@ -659,7 +659,7 @@ async function prepareComposioArgs(t: ComposioTool, args: any) {
   }
   if (
     typeof attachmentSource === "object" &&
-    attachmentSource?.s3key?.startsWith?.("projects/") &&
+    typeof attachmentSource?.s3key === "string" &&
     attachmentSource?.name &&
     attachmentSource?.mimetype
   ) {
