@@ -730,6 +730,14 @@ export const Route = createFileRoute("/api/chat")({
               if (process.env.E2B_API_KEY) {
                 subTools.run_code = createRunCodeTool(userId, sub.id, sub.name);
               }
+              if (process.env.LOVABLE_API_KEY) {
+                subTools.generate_image = createGenerateImageTool(
+                  process.env.LOVABLE_API_KEY,
+                  userId,
+                  sub.id,
+                  sub.name,
+                );
+              }
               try {
                 const result = streamText({
                   model: subModel,
