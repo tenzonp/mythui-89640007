@@ -222,6 +222,39 @@ export type Database = {
         }
         Relationships: []
       }
+      support_tickets: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string
+          priority: string
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          priority?: string
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          priority?: string
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       threads: {
         Row: {
           created_at: string
@@ -245,6 +278,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ticket_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_staff: boolean
+          sender_id: string
+          ticket_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_staff?: boolean
+          sender_id: string
+          ticket_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_staff?: boolean
+          sender_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_plans: {
         Row: {
@@ -276,6 +344,72 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_sites: {
+        Row: {
+          created_at: string
+          deployment_url: string | null
+          files: Json
+          id: string
+          last_error: string | null
+          name: string
+          prompt: string
+          status: string
+          style_notes: string | null
+          updated_at: string
+          user_id: string
+          vercel_project_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          deployment_url?: string | null
+          files?: Json
+          id?: string
+          last_error?: string | null
+          name: string
+          prompt: string
+          status?: string
+          style_notes?: string | null
+          updated_at?: string
+          user_id: string
+          vercel_project_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          deployment_url?: string | null
+          files?: Json
+          id?: string
+          last_error?: string | null
+          name?: string
+          prompt?: string
+          status?: string
+          style_notes?: string | null
+          updated_at?: string
+          user_id?: string
+          vercel_project_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -283,8 +417,16 @@ export type Database = {
     Functions: {
       get_credit_balance: { Args: { uid: string }; Returns: number }
       grant_daily_free_credits: { Args: never; Returns: undefined }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       plan_tier: "free" | "pro" | "everest"
     }
     CompositeTypes: {
@@ -413,6 +555,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       plan_tier: ["free", "pro", "everest"],
     },
   },
