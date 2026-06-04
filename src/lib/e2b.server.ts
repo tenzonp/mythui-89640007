@@ -9,14 +9,18 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const BUCKET = "artifacts";
 const OUT_DIR = "/home/user/out";
-const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
 export type Artifact = {
   name: string;
   path: string; // path inside the bucket
-  url: string; // signed URL
+  url: string; // proxy URL (/api/files/...)
   size: number;
   mime: string;
+  pageCount?: number;
+  isImage?: boolean;
+  isPdf?: boolean;
+  employeeId?: string;
+  employeeName?: string;
 };
 
 export type RunCodeResult = {
