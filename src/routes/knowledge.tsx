@@ -22,6 +22,7 @@ import {
 } from "@/lib/knowledge.functions";
 
 export const Route = createFileRoute("/knowledge")({
+  ssr: false,
   head: () => ({ meta: [{ title: "Knowledge base — Mythmind" }] }),
   component: KnowledgePage,
 });
