@@ -559,8 +559,8 @@ function ChatWindow({
   return (
     <>
       <div className="border-b bg-white">
-        <div className="px-8 pt-5 pb-2 flex items-center justify-between gap-3">
-          <h1 className="text-[20px] font-semibold tracking-tight truncate">{threadTitle}</h1>
+        <div className="px-6 pt-3 pb-1.5 flex items-center justify-between gap-3">
+          <h1 className="text-[17px] font-semibold tracking-tight truncate">{threadTitle}</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -570,38 +570,39 @@ function ChatWindow({
                   toast.success("Link copied");
                 }
               }}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border hover:bg-accent"
+              className="inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-lg border hover:bg-accent"
             >
-              <Share2 className="w-4 h-4" /> Share
+              <Share2 className="w-3.5 h-3.5" /> Share
             </button>
             <Link
               to="/integrations"
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border hover:bg-accent text-muted-foreground"
+              className="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg border hover:bg-accent text-muted-foreground"
               title={`${activeCount} integrations connected`}
             >
-              <Plug className="w-3.5 h-3.5" />
+              <Plug className="w-3 h-3" />
               {activeCount}
             </Link>
             <button
-              className="w-8 h-8 rounded-lg border hover:bg-accent inline-flex items-center justify-center text-muted-foreground"
+              className="w-7 h-7 rounded-lg border hover:bg-accent inline-flex items-center justify-center text-muted-foreground text-xs"
               aria-label="More"
             >
               ···
             </button>
           </div>
         </div>
-        <div className="px-8 flex items-center gap-6 text-sm">
-          {[
+        <div className="px-6 flex items-center gap-5 text-[13px]">
+          {([
             { k: "chat", label: "Chat" },
-            { k: "files", label: "Files" },
-            { k: "tasks", label: "Tasks" },
+            { k: "files", label: `Files${files.length ? ` (${files.length})` : ""}` },
+            { k: "tasks", label: `Tasks${tasks.length ? ` (${tasks.length})` : ""}` },
             { k: "notes", label: "Notes" },
-          ].map((t, i) => (
+          ] as { k: TabKey; label: string }[]).map((t) => (
             <button
               key={t.k}
+              onClick={() => setTab(t.k)}
               className={
-                "py-2.5 -mb-px border-b-2 " +
-                (i === 0
+                "py-1.5 -mb-px border-b-2 transition-colors " +
+                (tab === t.k
                   ? "border-violet text-foreground font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground")
               }
@@ -610,7 +611,7 @@ function ChatWindow({
             </button>
           ))}
           <div className="flex-1" />
-          <div className="flex items-center gap-2 py-1.5">
+          <div className="flex items-center gap-2 py-1">
             <img
               src={agent.image}
               alt={agent.name}
@@ -619,7 +620,7 @@ function ChatWindow({
             <select
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="text-xs border rounded-lg px-2 py-1 bg-background hover:bg-accent"
+              className="text-[11px] border rounded-lg px-2 py-1 bg-background hover:bg-accent"
               aria-label="Choose employee"
             >
               <option value="lin">Lin — CEO (auto-routes the team)</option>
@@ -636,33 +637,39 @@ function ChatWindow({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-[760px] mx-auto px-6 py-8 space-y-6">
-          {pendingInstagram.length > 0 && <InstagramPendingBanner pending={pendingInstagram} />}
-          {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
-          {messages.map((m) => (
-            <Message
-              key={m.id}
-              m={m}
-              onDelete={async () => {
-                setMessages((prev) => prev.filter((x) => x.id !== m.id));
-                try {
-                  await fnDeleteMsg({ data: { id: m.id } });
-                } catch {}
-              }}
-            />
-          ))}
-          {busy && messages[messages.length - 1]?.role !== "assistant" && (
-            <div className="text-sm text-muted-foreground flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…
-            </div>
-          )}
-          {error && (
-            <div className="text-sm text-destructive border border-destructive/30 rounded-lg p-3">
-              {error.message}
-            </div>
-          )}
-        </div>
+        {tab === "chat" && (
+          <div className="max-w-[760px] mx-auto px-6 py-5 space-y-5">
+            {pendingInstagram.length > 0 && <InstagramPendingBanner pending={pendingInstagram} />}
+            {messages.length === 0 && <EmptyState onPick={(t) => setInput(t)} />}
+            {messages.map((m) => (
+              <Message
+                key={m.id}
+                m={m}
+                onDelete={async () => {
+                  setMessages((prev) => prev.filter((x) => x.id !== m.id));
+                  try {
+                    await fnDeleteMsg({ data: { id: m.id } });
+                  } catch {}
+                }}
+              />
+            ))}
+            {busy && messages[messages.length - 1]?.role !== "assistant" && (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…
+              </div>
+            )}
+            {error && (
+              <div className="text-sm text-destructive border border-destructive/30 rounded-lg p-3">
+                {error.message}
+              </div>
+            )}
+          </div>
+        )}
+        {tab === "files" && <FilesPane files={files} />}
+        {tab === "tasks" && <TasksPane tasks={tasks} />}
+        {tab === "notes" && <NotesPane />}
       </div>
+
 
       <div className="border-t bg-background">
         <div className="max-w-[760px] mx-auto p-4">
