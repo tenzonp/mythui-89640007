@@ -47,6 +47,68 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_ledger: {
+        Row: {
+          agent_id: string | null
+          amount: number
+          complexity: string | null
+          created_at: string
+          id: string
+          kind: string
+          meta: Json
+          model: string | null
+          thread_id: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          amount: number
+          complexity?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          meta?: Json
+          model?: string | null
+          thread_id?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          amount?: number
+          complexity?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          model?: string | null
+          thread_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_grants: {
+        Row: {
+          grant_date: string
+          user_id: string
+        }
+        Insert: {
+          grant_date: string
+          user_id: string
+        }
+        Update: {
+          grant_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       instagram_pending_replies: {
         Row: {
           created_at: string
@@ -184,15 +246,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_plans: {
+        Row: {
+          created_at: string
+          dodo_subscription_id: string | null
+          monthly_credits: number
+          renews_at: string | null
+          tier: Database["public"]["Enums"]["plan_tier"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dodo_subscription_id?: string | null
+          monthly_credits?: number
+          renews_at?: string | null
+          tier?: Database["public"]["Enums"]["plan_tier"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dodo_subscription_id?: string | null
+          monthly_credits?: number
+          renews_at?: string | null
+          tier?: Database["public"]["Enums"]["plan_tier"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_credit_balance: { Args: { uid: string }; Returns: number }
     }
     Enums: {
-      [_ in never]: never
+      plan_tier: "free" | "pro" | "everest"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -319,6 +411,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      plan_tier: ["free", "pro", "everest"],
+    },
   },
 } as const

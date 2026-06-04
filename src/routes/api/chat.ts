@@ -25,6 +25,13 @@ import {
 import { webSearch, webScrape } from "@/lib/firecrawl.server";
 import { runCode } from "@/lib/e2b.server";
 import { agents, getAgent, type Agent } from "@/data/agents";
+import {
+  canStartTurn,
+  chargeTurn,
+  computeFinalCost,
+  inferComplexity,
+} from "@/lib/credits.server";
+import { getWynsaModel, type WynsaModelId } from "@/lib/plans";
 
 function createWebSearchTool() {
   return tool({
@@ -768,10 +775,31 @@ export const Route = createFileRoute("/api/chat")({
           messages: UIMessage[];
           threadId?: string;
           agentId?: string;
+          modelId?: WynsaModelId;
         };
         if (!Array.isArray(body.messages)) {
           return new Response("messages required", { status: 400 });
         }
+
+        // Credit + plan gate
+        const requestedModelId = (body.modelId ?? "lady") as WynsaModelId;
+        const wynsa = getWynsaModel(requestedModelId);
+        const gate = await canStartTurn({ userId, modelId: wynsa.id });
+        if (!gate.ok) {
+          return new Response(
+            JSON.stringify({
+              error:
+                gate.reason === "plan_locked"
+                  ? `${wynsa.name} is available on Pro and Everest. Upgrade to use it.`
+                  : `You're out of credits. Upgrade or wait for your next refill.`,
+              code: gate.reason,
+              tier: gate.plan.tier,
+              balance: gate.balance,
+            }),
+            { status: 402, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const isFree = gate.isFree;
 
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
         if (!deepseekKey) return new Response("Missing DEEPSEEK_API_KEY", { status: 500 });
@@ -1011,13 +1039,21 @@ export const Route = createFileRoute("/api/chat")({
           return false;
         })();
 
+        // Route every turn through the Lovable AI Gateway using the Wynsa
+        // model the user picked. Falls back to DeepSeek only if the gateway
+        // key is missing.
         let model: any;
-        if (hasImageAttachment && process.env.LOVABLE_API_KEY) {
+        if (process.env.LOVABLE_API_KEY) {
           const gateway = createLovableAiGatewayProvider(process.env.LOVABLE_API_KEY);
-          model = gateway("google/gemini-3-flash-preview");
-          console.log("[chat] Vision routing → gemini-3-flash-preview");
+          // Vision turns force Lady (Gemini Flash) because GPT can be slower
+          // for image attachments and we only need quick vision parsing.
+          const backendModel = hasImageAttachment
+            ? "google/gemini-2.5-flash"
+            : wynsa.backendModel;
+          model = gateway(backendModel);
+          console.log("[chat] Wynsa", wynsa.id, "→", backendModel);
         } else {
-          console.log("[chat] DeepSeek model selected:", chosenModel);
+          console.log("[chat] Fallback DeepSeek model:", chosenModel);
           model = deepseek(chosenModel);
         }
 
@@ -1070,22 +1106,81 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
+        // Track tool usage during the stream for credit math.
+        let toolCallCount = 0;
+        let usedResearch = false;
+        const delegatedAgentIds = new Set<string>();
+        delegatedAgentIds.add(agent.id);
+
         const result = streamText({
           model,
           system,
           tools: aiTools,
           stopWhen: stepCountIs(50),
           messages: await convertToModelMessages(outgoingMessages),
+          onStepFinish: (step) => {
+            for (const tc of step.toolCalls ?? []) {
+              toolCallCount++;
+              const t = String(tc.toolName ?? "").toLowerCase();
+              if (
+                t.includes("web_search") ||
+                t.includes("web_fetch") ||
+                t.includes("firecrawl") ||
+                t.includes("research")
+              )
+                usedResearch = true;
+              if (t === "delegate_to_employee") {
+                const emp = (tc.input as any)?.employee;
+                if (typeof emp === "string") delegatedAgentIds.add(emp);
+              }
+            }
+          },
         });
 
         const threadId = body.threadId;
         return result.toUIMessageStreamResponse({
           originalMessages: body.messages,
           onFinish: async ({ messages }) => {
-            if (!threadId) return;
             try {
               const lastUser = body.messages[body.messages.length - 1];
               const newAssistant = messages[messages.length - 1];
+              // Charge credits for this turn (always, even without thread).
+              try {
+                const outputChars = newAssistant?.role === "assistant"
+                  ? ((newAssistant.parts as any[]) ?? [])
+                      .map((p) => (p?.type === "text" ? String(p.text ?? "") : ""))
+                      .join("").length
+                  : 0;
+                const complexity = inferComplexity({
+                  outputChars,
+                  toolCalls: toolCallCount,
+                  delegatedAgents: delegatedAgentIds.size,
+                });
+                const cost = computeFinalCost({
+                  modelId: wynsa.id,
+                  complexity,
+                  usedResearch,
+                  delegatedAgents: delegatedAgentIds.size,
+                  isFree,
+                });
+                await chargeTurn({
+                  userId,
+                  threadId: threadId ?? null,
+                  modelId: wynsa.id,
+                  agentId: agent.id,
+                  complexity,
+                  amount: cost,
+                  meta: {
+                    tool_calls: toolCallCount,
+                    used_research: usedResearch,
+                    delegated: Array.from(delegatedAgentIds),
+                    output_chars: outputChars,
+                  },
+                });
+              } catch (e) {
+                console.error("credit charge failed", e);
+              }
+              if (!threadId) return;
               const rows: any[] = [];
               if (lastUser && lastUser.role === "user") {
                 rows.push({

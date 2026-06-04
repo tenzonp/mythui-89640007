@@ -45,6 +45,9 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { agents, getAgent } from "@/data/agents";
 import { useChatActivity, type ThreadFile, type ThreadTask } from "@/lib/chat-context";
+import { WYNSA_MODELS, getWynsaModel, type WynsaModelId, type PlanTier } from "@/lib/plans";
+import { getMyPlan } from "@/lib/credits.functions";
+import { Lock } from "lucide-react";
 
 type TabKey = "chat" | "files" | "tasks" | "notes";
 
@@ -157,6 +160,29 @@ function ChatWindow({
     agentRef.current = agentId;
   }, [agentId]);
 
+  // Wynsa model selection
+  const modelKey = `mythmind:model:${threadId}`;
+  const [modelId, setModelId] = useState<WynsaModelId>(() => {
+    if (typeof window === "undefined") return "lady";
+    return (window.localStorage.getItem(modelKey) as WynsaModelId) ?? "lady";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem(modelKey, modelId);
+  }, [modelId, modelKey]);
+  const modelRef = useRef(modelId);
+  useEffect(() => {
+    modelRef.current = modelId;
+  }, [modelId]);
+
+  // Plan tier (drives model gating)
+  const [planTier, setPlanTier] = useState<PlanTier>("free");
+  const fetchPlan = useServerFn(getMyPlan);
+  useEffect(() => {
+    fetchPlan()
+      .then((p) => setPlanTier(p.tier as PlanTier))
+      .catch(() => {});
+  }, []);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -169,7 +195,7 @@ function ChatWindow({
           return fetch(input, { ...init, headers });
         },
         prepareSendMessagesRequest: ({ messages, id }) => ({
-          body: { messages, threadId: id, agentId: agentRef.current },
+          body: { messages, threadId: id, agentId: agentRef.current, modelId: modelRef.current },
         }),
       }),
     [],
@@ -613,7 +639,8 @@ function ChatWindow({
             </button>
           ))}
           <div className="flex-1" />
-          <div className="flex items-center gap-2 py-1">
+          <ModelPicker modelId={modelId} setModelId={setModelId} userTier={planTier} />
+          <div className="flex items-center gap-1.5 py-1">
             <img
               src={agent.image}
               alt={agent.name}
@@ -1747,4 +1774,83 @@ function TimelineRow({ ev }: { ev: any }) {
     );
   }
   return null;
+}
+
+function ModelPicker({
+  modelId,
+  setModelId,
+  userTier,
+}: {
+  modelId: WynsaModelId;
+  setModelId: (id: WynsaModelId) => void;
+  userTier: PlanTier;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = getWynsaModel(modelId);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-[11px] border rounded-lg px-2 py-1 bg-background hover:bg-accent"
+        aria-label="Choose model"
+      >
+        <Sparkles className="w-3 h-3 text-violet" />
+        <span className="font-medium">{current.name}</span>
+        <span className="text-muted-foreground">· {current.effort}</span>
+        <ChevronDown className="w-3 h-3 text-muted-foreground" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 w-[260px] rounded-xl border bg-card shadow-xl p-1.5">
+            {WYNSA_MODELS.map((m) => {
+              const locked = !m.allowedTiers.includes(userTier);
+              const active = m.id === modelId;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => {
+                    if (locked) return;
+                    setModelId(m.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "w-full text-left px-2.5 py-2 rounded-lg flex items-start gap-2 transition-colors",
+                    active && "bg-violet/10",
+                    locked ? "opacity-60 cursor-not-allowed" : "hover:bg-accent",
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12.5px] font-medium">{m.name}</span>
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {m.effort}
+                      </span>
+                      {locked && <Lock className="w-3 h-3 text-muted-foreground ml-auto" />}
+                      {active && !locked && (
+                        <Check className="w-3 h-3 text-violet ml-auto" />
+                      )}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      {locked ? "Upgrade to Pro to unlock" : m.blurb}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+            <Link
+              to="/billing"
+              className="block text-center text-[11px] text-violet hover:underline mt-1 py-1.5 border-t"
+              onClick={() => setOpen(false)}
+            >
+              View plans →
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
