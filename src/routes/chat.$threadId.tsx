@@ -315,6 +315,31 @@ function ChatWindow({
       <div className="border-t bg-background">
         <div className="max-w-[760px] mx-auto p-4">
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-2 pb-0">
+                {attachments.map((a, i) => (
+                  <div
+                    key={i}
+                    className="group relative flex items-center gap-2 border rounded-lg px-2 py-1.5 text-xs bg-muted/40"
+                  >
+                    {a.isImage ? (
+                      <img src={a.url} alt={a.name} className="w-8 h-8 rounded object-cover" />
+                    ) : (
+                      <FileIcon className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <span className="max-w-[160px] truncate">{a.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))}
+                      className="opacity-60 hover:opacity-100"
+                      aria-label="Remove"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               ref={taRef}
               value={input}
@@ -327,12 +352,33 @@ function ChatWindow({
               }}
               rows={1}
               placeholder="Ask your AI team anything…"
-              className="w-full resize-none bg-transparent px-4 py-3.5 pr-14 text-sm outline-none max-h-48"
+              className="w-full resize-none bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none max-h-48"
+            />
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => onPickFiles(e.target.files)}
             />
             <button
               type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="absolute left-2 bottom-2 w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-accent text-muted-foreground disabled:opacity-40"
+              aria-label="Attach files"
+              title="Attach files (images, PDFs, CSVs…)"
+            >
+              {uploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Paperclip className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              type="button"
               onClick={submit}
-              disabled={busy || !input.trim()}
+              disabled={busy || (!input.trim() && attachments.length === 0)}
               className="absolute right-2 bottom-2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
               aria-label="Send"
             >
@@ -344,7 +390,7 @@ function ChatWindow({
             </button>
           </div>
           <p className="text-[11px] text-muted-foreground text-center mt-2">
-            Mythmind can use your connected integrations to take real actions.
+            Mythmind can read your attachments, see images, and ship real files back.
           </p>
         </div>
       </div>
