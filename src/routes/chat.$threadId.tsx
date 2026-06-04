@@ -613,7 +613,8 @@ function ChatWindow({
             </button>
           ))}
           <div className="flex-1" />
-          <div className="flex items-center gap-2 py-1">
+          <ModelPicker modelId={modelId} setModelId={setModelId} userTier={planTier} />
+          <div className="flex items-center gap-1.5 py-1">
             <img
               src={agent.image}
               alt={agent.name}
