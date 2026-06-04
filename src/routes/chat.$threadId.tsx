@@ -45,6 +45,9 @@ import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { agents, getAgent } from "@/data/agents";
 import { useChatActivity, type ThreadFile, type ThreadTask } from "@/lib/chat-context";
+import { WYNSA_MODELS, getWynsaModel, type WynsaModelId, type PlanTier } from "@/lib/plans";
+import { getMyPlan } from "@/lib/credits.functions";
+import { Lock } from "lucide-react";
 
 type TabKey = "chat" | "files" | "tasks" | "notes";
 
