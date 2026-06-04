@@ -220,6 +220,45 @@ function createGenerateImageTool(
   });
 }
 
+function createListRecentFilesTool(userId: string) {
+  return tool({
+    description:
+      "List the user's stored chat artifacts/uploads so you can reuse a previous generated image, PDF, or uploaded file instead of regenerating it. Use before attaching an older file to Gmail/Instagram/Slack/etc.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Maximum files to return. Default 20, max 50." },
+      },
+    }),
+    execute: async (args: any) => {
+      const limit = Math.max(1, Math.min(Number(args?.limit ?? 20) || 20, 50));
+      const prefixes = [userId, `${userId}/generated`, `${userId}/uploads`];
+      const rows: any[] = [];
+      for (const prefix of prefixes) {
+        const { data, error } = await supabaseAdmin.storage.from("artifacts").list(prefix, {
+          limit,
+          sortBy: { column: "created_at", order: "desc" },
+        });
+        if (error) continue;
+        for (const item of data ?? []) {
+          if (!item.name || !item.id) continue;
+          const path = `${prefix}/${item.name}`;
+          rows.push({
+            name: item.name,
+            path,
+            url: `/api/files/${encodeURIComponent(path)}`,
+            mime: guessMimeFromName(item.name),
+            size: item.metadata?.size,
+            created_at: item.created_at,
+          });
+        }
+      }
+      rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+      return { files: rows.slice(0, limit) };
+    },
+  });
+}
+
 
 
 function extractByKeys(value: any, keys: string[]): string | null {
