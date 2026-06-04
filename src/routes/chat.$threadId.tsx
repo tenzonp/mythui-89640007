@@ -213,14 +213,25 @@ function ChatWindow({
     const text = input.trim();
     if ((!text && attachments.length === 0) || status === "submitted" || status === "streaming")
       return;
-    const atts = attachments;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const atts = attachments.map((a) => ({
+      ...a,
+      url: a.url.startsWith("http") ? a.url : `${origin}${a.url}`,
+    }));
     const attLines = atts.length
       ? "\n\n📎 Attached files (use run_code with `requests` to download/inspect, or web_fetch for text URLs):\n" +
-        atts.map((a) => `- ${a.name} (${a.mime}) — ${a.url}`).join("\n")
+        atts
+          .map(
+            (a) =>
+              `- ${a.name} (${a.mime}${a.pageCount ? `, ${a.pageCount} pages` : ""}) — ${a.url}`,
+          )
+          .join("\n")
       : "";
     const parts: any[] = [{ type: "text", text: (text || "(see attached files)") + attLines }];
     for (const a of atts) {
       if (a.isImage) {
+        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
+      } else {
         parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
       }
     }
