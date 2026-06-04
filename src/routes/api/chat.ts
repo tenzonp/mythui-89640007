@@ -213,6 +213,9 @@ function createGenerateImageTool(
       }
     },
   });
+}
+
+
 
 function extractByKeys(value: any, keys: string[]): string | null {
   if (!value || typeof value !== "object") return null;
