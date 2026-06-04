@@ -72,6 +72,18 @@ function friendlyToolLabel(name: string): { label: string; icon?: string } {
   return { label: name.replace(/_/g, " ") };
 }
 
+// Map a tool name → the AI employee who owns that kind of work.
+function toolOwner(name: string): string | undefined {
+  const n = name.toLowerCase();
+  if (n.includes("build_website") || n.includes("site") || n.includes("design") || n.includes("figma") || n.includes("notion") || n.includes("linear") || n.includes("jira") || n.includes("research") || n.includes("firecrawl") || n.includes("web_fetch") || n.includes("image") || n.includes("video")) return "reyes";
+  if (n.includes("instagram") || n.includes("twitter") || n.includes("x_post") || n.includes("tiktok") || n.includes("youtube") || n.includes("facebook") || n.includes("linkedin") || n.includes("mailchimp") || n.includes("hubspot") || n.includes("ads") || n.includes("analytics")) return "vale";
+  if (n.includes("salesforce") || n.includes("apollo") || n.includes("calendly") || n.includes("calendar") || n.includes("gmail") || n.includes("mail")) return "bloom";
+  if (n.includes("zapier") || n.includes("sheet") || n.includes("airtable") || n.includes("github") || n.includes("drive") || n.includes("run_code") || n.includes("e2b") || n.includes("slack")) return "kade";
+  if (n.includes("intercom") || n.includes("zendesk") || n.includes("discord") || n.includes("support") || n.includes("ticket")) return "sage";
+  if (n.includes("knowledge")) return "lin";
+  return undefined;
+}
+
 function timeAgo(d: Date) {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
