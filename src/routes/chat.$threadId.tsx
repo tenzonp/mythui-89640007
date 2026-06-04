@@ -448,37 +448,192 @@ function InstagramPendingBanner({ pending }: { pending: any[] }) {
   );
 }
 
-function renderFileParts(parts: any[]) {
-  const files = parts.filter(
-    (p) => p.type === "file" && typeof p.url === "string",
-  );
+function bytesLabel(n?: number) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function FileGrid({
+  files,
+  align = "start",
+}: {
+  files: any[];
+  align?: "start" | "end";
+}) {
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   if (!files.length) return null;
+  const images = files.filter((f) => (f.mediaType ?? f.mime ?? "").startsWith("image/"));
+  const others = files.filter((f) => !(f.mediaType ?? f.mime ?? "").startsWith("image/"));
+  const justify = align === "end" ? "justify-end" : "justify-start";
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {files.map((f, i) =>
-        (f.mediaType ?? "").startsWith("image/") ? (
-          <a key={i} href={f.url} target="_blank" rel="noreferrer">
-            <img
-              src={f.url}
-              alt={f.filename ?? "image"}
-              className="max-h-48 rounded-lg border object-cover"
-            />
-          </a>
-        ) : (
-          <a
-            key={i}
-            href={f.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-xs bg-muted/30 hover:bg-accent"
-          >
-            <FileIcon className="w-4 h-4" />
-            <span className="max-w-[200px] truncate">{f.filename ?? "file"}</span>
-          </a>
-        ),
+    <div className={`flex flex-col gap-2 ${align === "end" ? "items-end" : "items-start"} max-w-full`}>
+      {images.length > 0 && (
+        <div
+          className={`grid gap-1.5 ${justify} ${
+            images.length === 1
+              ? "grid-cols-1"
+              : images.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-3"
+          }`}
+          style={{ maxWidth: 360 }}
+        >
+          {images.map((f, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setLightboxIdx(i)}
+              className="block overflow-hidden rounded-lg border bg-muted/30 hover:opacity-90 transition"
+            >
+              <img
+                src={f.url}
+                alt={f.filename ?? f.name ?? "image"}
+                className={`object-cover ${
+                  images.length === 1 ? "max-h-72 w-auto" : "h-28 w-28"
+                }`}
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+      {others.length > 0 && (
+        <div className={`grid sm:grid-cols-2 gap-2 w-full max-w-[480px]`}>
+          {others.map((f, i) => (
+            <FileChip key={i} f={f} />
+          ))}
+        </div>
+      )}
+      {lightboxIdx !== null && (
+        <Lightbox
+          images={images}
+          index={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+          onIndex={setLightboxIdx}
+        />
       )}
     </div>
   );
+}
+
+function FileChip({ f }: { f: any }) {
+  const mime = f.mediaType ?? f.mime ?? "";
+  const name = f.filename ?? f.name ?? "file";
+  const isPdf = mime.includes("pdf") || name.toLowerCase().endsWith(".pdf");
+  const size = bytesLabel(f.size);
+  const meta = [
+    mime.split("/").pop()?.toUpperCase(),
+    f.pageCount ? `${f.pageCount} page${f.pageCount === 1 ? "" : "s"}` : null,
+    size,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <a
+      href={`${f.url}${f.url.includes("?") ? "&" : "?"}download=1&name=${encodeURIComponent(name)}`}
+      className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent transition-colors group/card"
+    >
+      <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        {isPdf ? <FileText className="w-5 h-5" /> : <FileIcon className="w-5 h-5" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate">{name}</div>
+        <div className="text-[11px] text-muted-foreground truncate">{meta || mime}</div>
+      </div>
+      <Download className="w-4 h-4 text-muted-foreground group-hover/card:text-foreground" />
+    </a>
+  );
+}
+
+function Lightbox({
+  images,
+  index,
+  onClose,
+  onIndex,
+}: {
+  images: any[];
+  index: number;
+  onClose: () => void;
+  onIndex: (i: number) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") onIndex((index + 1) % images.length);
+      if (e.key === "ArrowLeft") onIndex((index - 1 + images.length) % images.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, images.length]);
+  const img = images[index];
+  if (!img) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <a
+        href={`${img.url}${img.url.includes("?") ? "&" : "?"}download=1&name=${encodeURIComponent(img.filename ?? img.name ?? "image")}`}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-4 right-16 text-white/80 hover:text-white p-2"
+        aria-label="Download"
+      >
+        <Download className="w-5 h-5" />
+      </a>
+      <img
+        src={img.url}
+        alt={img.filename ?? "image"}
+        className="max-h-[90vh] max-w-[92vw] object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndex((index - 1 + images.length) % images.length);
+            }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-3 rounded-full bg-white/10"
+            aria-label="Previous"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onIndex((index + 1) % images.length);
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-3 rounded-full bg-white/10"
+            aria-label="Next"
+          >
+            ›
+          </button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-xs">
+            {index + 1} / {images.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function renderFileParts(parts: any[]) {
+  const files = parts.filter((p) => p.type === "file" && typeof p.url === "string");
+  if (!files.length) return null;
+  return <FileGrid files={files} align="end" />;
 }
 
 function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
