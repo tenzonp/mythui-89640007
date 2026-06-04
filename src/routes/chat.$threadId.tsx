@@ -448,16 +448,56 @@ function InstagramPendingBanner({ pending }: { pending: any[] }) {
   );
 }
 
+function renderFileParts(parts: any[]) {
+  const files = parts.filter(
+    (p) => p.type === "file" && typeof p.url === "string",
+  );
+  if (!files.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {files.map((f, i) =>
+        (f.mediaType ?? "").startsWith("image/") ? (
+          <a key={i} href={f.url} target="_blank" rel="noreferrer">
+            <img
+              src={f.url}
+              alt={f.filename ?? "image"}
+              className="max-h-48 rounded-lg border object-cover"
+            />
+          </a>
+        ) : (
+          <a
+            key={i}
+            href={f.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-xs bg-muted/30 hover:bg-accent"
+          >
+            <FileIcon className="w-4 h-4" />
+            <span className="max-w-[200px] truncate">{f.filename ?? "file"}</span>
+          </a>
+        ),
+      )}
+    </div>
+  );
+}
+
 function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
-  const text = m.parts.map((p: any) => (p.type === "text" ? p.text : "")).join("");
+  const visibleText = m.parts
+    .map((p: any) => (p.type === "text" ? p.text : ""))
+    .join("")
+    .replace(/\n\n📎 Attached files[\s\S]*$/, "")
+    .trim();
 
   if (m.role === "user") {
     return (
-      <div className="group flex flex-col items-end gap-1">
-        <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
-          {text}
-        </div>
-        <MessageActions text={text} onDelete={onDelete} role="user" />
+      <div className="group flex flex-col items-end gap-1 max-w-full">
+        {renderFileParts(m.parts as any[])}
+        {visibleText && (
+          <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
+            {visibleText}
+          </div>
+        )}
+        <MessageActions text={visibleText} onDelete={onDelete} role="user" />
       </div>
     );
   }
@@ -476,7 +516,7 @@ function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
         }
         return null;
       })}
-      <MessageActions text={text} onDelete={onDelete} role="assistant" />
+      <MessageActions text={visibleText} onDelete={onDelete} role="assistant" />
     </div>
   );
 }
