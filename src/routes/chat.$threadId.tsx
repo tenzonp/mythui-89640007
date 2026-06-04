@@ -640,28 +640,6 @@ function ChatWindow({
           ))}
           <div className="flex-1" />
           <ModelPicker modelId={modelId} setModelId={setModelId} userTier={planTier} />
-          <div className="flex items-center gap-1.5 py-1">
-            <img
-              src={agent.image}
-              alt={agent.name}
-              className="w-5 h-5 rounded-full object-cover"
-            />
-            <select
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-              className="text-[11px] border rounded-lg px-2 py-1 bg-background hover:bg-accent"
-              aria-label="Choose employee"
-            >
-              <option value="lin">Lin — CEO (auto-routes the team)</option>
-              {agents
-                .filter((a) => a.id !== "lin")
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} — {a.role}
-                  </option>
-                ))}
-            </select>
-          </div>
         </div>
       </div>
 
