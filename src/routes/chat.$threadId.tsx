@@ -149,6 +149,12 @@ function ChatWindow({
   const fnDeleteMsg = useServerFn(deleteMessage);
 
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<
+    { name: string; url: string; mime: string; size: number; isImage: boolean }[]
+  >([]);
+  const [uploading, setUploading] = useState(false);
+  const fnUpload = useServerFn(uploadAttachment);
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
