@@ -125,6 +125,95 @@ function createRunCodeTool(userId: string, employeeId?: string, employeeName?: s
   });
 }
 
+function createGenerateImageTool(
+  lovableApiKey: string,
+  userId: string,
+  employeeId?: string,
+  employeeName?: string,
+) {
+  return tool({
+    description:
+      "Generate a NEW image from a text prompt using Lovable AI (low-cost, high quality). Use this whenever the user asks to create / make / draw / design an image, logo, flag, illustration, poster, banner, social-media graphic, or any visual. Returns an artifact with a public URL — share that URL as a markdown image link `![alt](url)` so it renders inline, and also reuse the URL in follow-up tool calls (e.g. posting to Instagram, attaching to Gmail).",
+    inputSchema: jsonSchema({
+      type: "object",
+      required: ["prompt"],
+      properties: {
+        prompt: { type: "string", description: "Describe the image to generate in detail." },
+        size: {
+          type: "string",
+          enum: ["1024x1024", "1024x1536", "1536x1024"],
+          description: "Image dimensions. Default 1024x1024.",
+        },
+        filename: {
+          type: "string",
+          description: "Optional file name (without extension) for the saved image.",
+        },
+      },
+    }),
+    execute: async (args: any) => {
+      const parsed = z
+        .object({
+          prompt: z.string().min(1).max(4000),
+          size: z.enum(["1024x1024", "1024x1536", "1536x1024"]).optional(),
+          filename: z.string().max(80).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success) return { error: "Invalid arguments" };
+      try {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Lovable-API-Key": lovableApiKey,
+            "Content-Type": "application/json",
+            "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-image-2",
+            prompt: parsed.data.prompt,
+            quality: "low",
+            size: parsed.data.size ?? "1024x1024",
+            n: 1,
+          }),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          return { error: `Image generation failed (${res.status}): ${txt.slice(0, 300)}` };
+        }
+        const json: any = await res.json();
+        const b64 = json?.data?.[0]?.b64_json;
+        if (!b64) return { error: "No image returned by provider" };
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const safe = (parsed.data.filename ?? "generated")
+          .replace(/[^a-zA-Z0-9._-]/g, "_")
+          .slice(0, 60);
+        const path = `${userId}/generated/${Date.now()}-${safe}.png`;
+        const { error: upErr } = await supabaseAdmin.storage
+          .from("artifacts")
+          .upload(path, bytes, { contentType: "image/png", upsert: false });
+        if (upErr) return { error: upErr.message };
+        const url = `/api/files/${encodeURIComponent(path)}`;
+        return {
+          ok: true,
+          artifacts: [
+            {
+              name: `${safe}.png`,
+              path,
+              url,
+              mime: "image/png",
+              size: bytes.byteLength,
+              isImage: true,
+              employeeId,
+              employeeName,
+            },
+          ],
+          message: `Generated image saved. Share \`![${safe}](${url})\` in the reply so the user sees it inline.`,
+        };
+      } catch (e: any) {
+        return { error: e?.message ?? "Image generation failed" };
+      }
+    },
+  });
+
 function extractByKeys(value: any, keys: string[]): string | null {
   if (!value || typeof value !== "object") return null;
   for (const [key, nested] of Object.entries(value)) {
