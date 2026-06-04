@@ -625,11 +625,15 @@ export const Route = createFileRoute("/api/chat")({
                 },
               ];
 
+              const subTools: Record<string, any> = { ...subLoaded.tools };
+              if (process.env.E2B_API_KEY) {
+                subTools.run_code = createRunCodeTool(userId, sub.id, sub.name);
+              }
               try {
                 const result = streamText({
                   model: subModel,
                   system: subSystem,
-                  tools: subLoaded.tools,
+                  tools: subTools,
                   stopWhen: stepCountIs(20),
                   messages: [{ role: "user", content: parsed.data.task }],
                   onStepFinish: (step) => {
