@@ -1,11 +1,11 @@
 // High-level helper that goes from a user prompt -> generated files -> ZIP
-// uploaded to Supabase Storage -> live Vercel deployment. Used by the chat
+// uploaded to Supabase Storage -> live Netlify deployment. Used by the chat
 // build_website tool and by the /sites page.
 
 import JSZip from "jszip";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { generateSiteFiles, type GeneratedFile } from "./site-generator.server";
-import { deployToVercel } from "./vercel.server";
+import { deployToNetlify } from "./netlify.server";
 
 export type BuildResult = {
   siteId: string;
@@ -63,8 +63,8 @@ export async function buildAndDeploySite(opts: {
       .update({ files: files as any, status: "deploying" })
       .eq("id", site.id);
 
-    // 4. Deploy to Vercel.
-    const dep = await deployToVercel({ name, files });
+    // 4. Deploy to Netlify.
+    const dep = await deployToNetlify({ name, files });
 
     await supabaseAdmin
       .from("user_sites")

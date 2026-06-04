@@ -43,7 +43,7 @@ function SitesPage() {
       <PageHero
         kicker="WEBSITE BUILDER"
         title={<>Generate any <em className="font-serif italic text-violet">website</em> in minutes</>}
-        subtitle="Describe what you want. Mythmind generates a futuristic Next.js site and deploys it live to Vercel — you get a real URL instantly."
+        subtitle="Describe what you want. Mythmind generates a futuristic static site and deploys it live to Netlify — you get a real URL in seconds."
       />
       <div className="max-w-4xl mx-auto px-8 pb-20 grid gap-8">
         <Card className="p-6 grid gap-3">
@@ -69,7 +69,7 @@ function SitesPage() {
           />
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="text-xs text-muted-foreground">
-              Costs 1000 credits per build. Includes generation + live Vercel deploy.
+              Costs 1000 credits per build. Includes generation + live Netlify deploy.
             </div>
             <Button
               onClick={() => create.mutate()}
@@ -80,7 +80,7 @@ function SitesPage() {
           </div>
           {create.isPending && (
             <div className="text-xs text-muted-foreground">
-              This can take 30–90 seconds. We're calling the AI, packaging files, and shipping to Vercel.
+              Static-site builds typically take 15–40 seconds. AI writes the pages, we ZIP them, and ship to Netlify.
             </div>
           )}
         </Card>

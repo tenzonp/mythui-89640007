@@ -898,8 +898,8 @@ export const Route = createFileRoute("/api/chat")({
           },
         });
 
-        // build_website tool — full generate + ZIP + Vercel deploy in one call.
-        if (process.env.LOVABLE_API_KEY && process.env.VERCEL_TOKEN) {
+        // build_website tool — full generate + ZIP + Netlify deploy in one call.
+        if (process.env.LOVABLE_API_KEY && process.env.NETLIFY_AUTH_TOKEN) {
           aiTools.build_website = tool({
             description:
               "Generate and deploy a complete Next.js 14 website. Use whenever the user asks to build/create a website, landing page, or marketing site for their business. Returns a live URL and a downloadable ZIP. Costs 1000 credits. Pulls real internet images (Unsplash/Pexels), videos (YouTube/Vimeo), icons (lucide), and Framer Motion animations. Tailor the prompt using everything you know about the user's business.",
