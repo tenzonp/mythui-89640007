@@ -636,6 +636,27 @@ async function prepareComposioArgs(t: ComposioTool, args: any) {
   const next = { ...(args ?? {}) };
   const attachmentSource = next.attachment ?? findStoredImageUrlInHtml(next);
   if (!attachmentSource) return next;
+  if (Array.isArray(attachmentSource)) {
+    const staged = [];
+    for (const item of attachmentSource) {
+      const file = await readFileReference(item);
+      if (!file) continue;
+      if (file.bytes.byteLength > 24 * 1024 * 1024) {
+        throw new Error("Attachment is too large for Gmail (max ~24MB before encoding).");
+      }
+      staged.push(
+        await stageFileBufferForTool({
+          bytes: file.bytes,
+          filename: file.name,
+          mimetype: file.mimetype,
+          toolSlug: t.slug,
+          toolkitSlug: t.toolkit?.slug ?? "gmail",
+        }),
+      );
+    }
+    if (staged.length) next.attachment = staged.length === 1 ? staged[0] : staged;
+    return next;
+  }
   if (
     typeof attachmentSource === "object" &&
     attachmentSource?.s3key?.startsWith?.("projects/") &&
