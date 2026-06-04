@@ -544,10 +544,17 @@ function ChatWindow({
             });
           } else {
             const f = friendlyToolLabel(name);
+            // Map tool → owning employee so the sidebar shows the right teammate working.
+            const owner = toolOwner(name);
+            if (owner) {
+              if (tStatus === "running") working.add(owner);
+              else active.add(owner);
+            }
             tasks.push({
               id: `${m.id}-${name}-${tasks.length}`,
               label: f.label,
               detail: name,
+              agentId: owner,
               status: tStatus,
             });
           }
