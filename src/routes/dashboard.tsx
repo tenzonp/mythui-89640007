@@ -43,6 +43,8 @@ function Dashboard() {
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [plan, setPlan] = useState<any>(null);
+  const fetchPlan = useServerFn(getMyPlan);
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth", replace: true });
@@ -56,6 +58,10 @@ function Dashboard() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => setProfile(data));
+    const load = () => fetchPlan().then(setPlan).catch(() => {});
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
   }, [user]);
 
   if (loading || !user) {
@@ -69,11 +75,22 @@ function Dashboard() {
   const name = profile?.display_name ?? user.email?.split("@")[0] ?? "there";
   const initial = name[0]?.toUpperCase() ?? "U";
 
+  const creditsMax = plan
+    ? plan.tier === "free"
+      ? plan.dailyFreeCredits
+      : plan.monthlyCredits
+    : 0;
+
   const stats = [
+    {
+      label: plan?.tier === "free" ? "Credits today" : "Credits this month",
+      value: plan ? plan.balance.toLocaleString() : "—",
+      icon: Sparkles,
+      trend: plan ? `of ${creditsMax.toLocaleString()}` : "loading",
+    },
     { label: "Tasks completed", value: "248", icon: CheckCircle2, trend: "+12%" },
-    { label: "Active agents", value: "5", icon: Sparkles, trend: "All online" },
+    { label: "Active agents", value: "5", icon: Users, trend: "All online" },
     { label: "Hours saved", value: "94h", icon: Clock, trend: "this week" },
-    { label: "Output quality", value: "98%", icon: TrendingUp, trend: "+3%" },
   ];
 
   const recentTasks = [
