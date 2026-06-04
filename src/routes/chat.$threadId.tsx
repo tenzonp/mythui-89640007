@@ -706,6 +706,15 @@ function bytesLabel(n?: number) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function classifyFile(f: any) {
+  const mime = (f.mediaType ?? f.mime ?? "").toLowerCase();
+  const name = (f.filename ?? f.name ?? "").toLowerCase();
+  const isImage = mime.startsWith("image/");
+  const isVideo = mime.startsWith("video/") || /\.(mp4|webm|mov|m4v|ogv)$/.test(name);
+  const isPdf = mime.includes("pdf") || name.endsWith(".pdf");
+  return { isImage, isVideo, isPdf, viewable: isImage || isVideo || isPdf };
+}
+
 function FileGrid({
   files,
   align = "start",
@@ -713,42 +722,70 @@ function FileGrid({
   files: any[];
   align?: "start" | "end";
 }) {
-  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
   if (!files.length) return null;
-  const images = files.filter((f) => (f.mediaType ?? f.mime ?? "").startsWith("image/"));
-  const others = files.filter((f) => !(f.mediaType ?? f.mime ?? "").startsWith("image/"));
+  const viewable = files.filter((f) => classifyFile(f).viewable);
+  const others = files.filter((f) => !classifyFile(f).viewable);
   const justify = align === "end" ? "justify-end" : "justify-start";
+  const onlyImages = viewable.every((f) => classifyFile(f).isImage);
 
   return (
     <div className={`flex flex-col gap-2 ${align === "end" ? "items-end" : "items-start"} max-w-full`}>
-      {images.length > 0 && (
+      {viewable.length > 0 && (
         <div
           className={`grid gap-1.5 ${justify} ${
-            images.length === 1
+            viewable.length === 1
               ? "grid-cols-1"
-              : images.length === 2
+              : viewable.length === 2
                 ? "grid-cols-2"
                 : "grid-cols-3"
           }`}
           style={{ maxWidth: 360 }}
         >
-          {images.map((f, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setLightboxIdx(i)}
-              className="block overflow-hidden rounded-lg border bg-muted/30 hover:opacity-90 transition"
-            >
-              <img
-                src={f.url}
-                alt={f.filename ?? f.name ?? "image"}
-                className={`object-cover ${
-                  images.length === 1 ? "max-h-72 w-auto" : "h-28 w-28"
-                }`}
-                loading="lazy"
-              />
-            </button>
-          ))}
+          {viewable.map((f, i) => {
+            const { isImage, isVideo, isPdf } = classifyFile(f);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setViewerIdx(i)}
+                className="relative block overflow-hidden rounded-lg border bg-muted/30 hover:opacity-90 transition group"
+              >
+                {isImage ? (
+                  <img
+                    src={f.url}
+                    alt={f.filename ?? f.name ?? "image"}
+                    className={`object-cover ${
+                      onlyImages && viewable.length === 1 ? "max-h-72 w-auto" : "h-28 w-28"
+                    }`}
+                    loading="lazy"
+                  />
+                ) : isVideo ? (
+                  <div className="h-28 w-28 relative bg-black flex items-center justify-center">
+                    <video
+                      src={f.url}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition" />
+                    <Play className="w-7 h-7 text-white relative drop-shadow" />
+                  </div>
+                ) : isPdf ? (
+                  <div className="h-28 w-28 bg-card flex flex-col items-center justify-center text-center px-2">
+                    <FileText className="w-6 h-6 text-primary mb-1" />
+                    <div className="text-[10px] truncate w-full">{f.filename ?? f.name}</div>
+                    {f.pageCount && (
+                      <div className="text-[10px] text-muted-foreground">
+                        {f.pageCount}p
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       )}
       {others.length > 0 && (
@@ -758,12 +795,12 @@ function FileGrid({
           ))}
         </div>
       )}
-      {lightboxIdx !== null && (
+      {viewerIdx !== null && (
         <Lightbox
-          images={images}
-          index={lightboxIdx}
-          onClose={() => setLightboxIdx(null)}
-          onIndex={setLightboxIdx}
+          images={viewable}
+          index={viewerIdx}
+          onClose={() => setViewerIdx(null)}
+          onIndex={setViewerIdx}
         />
       )}
     </div>
