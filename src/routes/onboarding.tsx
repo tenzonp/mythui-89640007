@@ -600,14 +600,11 @@ function FieldInput({ value, onChange, placeholder }: any) {
 function IntroScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="text-center pt-10">
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", damping: 12 }}
-        className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 flex items-center justify-center shadow-[0_0_60px_-10px_rgba(168,85,247,0.8)]"
+      <div
+        className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 flex items-center justify-center shadow-[0_0_60px_-10px_rgba(168,85,247,0.8)] animate-in zoom-in-50 fade-in-0 duration-500"
       >
         <Brain className="w-10 h-10 text-white" />
-      </motion.div>
+      </div>
       <h1 className="mt-8 text-4xl md:text-6xl font-serif leading-[1.05] tracking-tight">
         Let's <em className="italic bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">hack</em><br />
         Wynsa's brain with <em className="italic bg-gradient-to-r from-amber-200 to-fuchsia-300 bg-clip-text text-transparent">your business.</em>
@@ -627,13 +624,11 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 function DoneScreen({ onGoChat, onGoKnowledge }: any) {
   return (
     <div className="text-center pt-10">
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: "spring", damping: 10 }}
-        className="mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-violet-500 flex items-center justify-center shadow-[0_0_80px_-10px_rgba(52,211,153,0.6)]"
+      <div
+        className="mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-violet-500 flex items-center justify-center shadow-[0_0_80px_-10px_rgba(52,211,153,0.6)] animate-in zoom-in-50 spin-in-45 fade-in-0 duration-500"
       >
         <Check className="w-12 h-12 text-white" strokeWidth={3} />
-      </motion.div>
+      </div>
       <h1 className="mt-8 text-4xl md:text-6xl font-serif">
         Wynsa is <em className="italic bg-gradient-to-r from-emerald-300 to-violet-300 bg-clip-text text-transparent">awake.</em>
       </h1>
