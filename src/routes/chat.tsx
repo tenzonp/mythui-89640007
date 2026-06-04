@@ -7,6 +7,7 @@ import {
   createThread,
   deleteThread,
 } from "@/lib/chat.functions";
+import { getMyPlan } from "@/lib/credits.functions";
 import {
   Plus,
   Trash2,
