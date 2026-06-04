@@ -1,6 +1,32 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHost } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLANS, type PlanTier } from "./plans";
+
+export const startDodoCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { tier: PlanTier }) => d)
+  .handler(async ({ context, data }) => {
+    if (data.tier === "free") throw new Error("Free plan does not require checkout");
+    const { createDodoCheckout } = await import("./dodo.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const host = getRequestHost();
+    const proto = host.includes("localhost") ? "http" : "https";
+    const returnUrl = `${proto}://${host}/billing?status=success`;
+    const { url } = await createDodoCheckout({
+      tier: data.tier,
+      userId: context.userId,
+      email: profile?.email ?? `${context.userId}@users.mythmind.app`,
+      returnUrl,
+    });
+    return { url };
+  });
+
 
 export const getMyPlan = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

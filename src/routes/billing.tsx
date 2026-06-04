@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getMyPlan, getMyLedger, devSetPlan } from "@/lib/credits.functions";
+import { getMyPlan, getMyLedger, devSetPlan, startDodoCheckout } from "@/lib/credits.functions";
 import { PLANS, type PlanTier } from "@/lib/plans";
 import { Check, Sparkles, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,8 +16,10 @@ function BillingPage() {
   const fetchPlan = useServerFn(getMyPlan);
   const fetchLedger = useServerFn(getMyLedger);
   const switchPlan = useServerFn(devSetPlan);
+  const checkout = useServerFn(startDodoCheckout);
   const [plan, setPlan] = useState<any>(null);
   const [entries, setEntries] = useState<any[]>([]);
+  const [loadingTier, setLoadingTier] = useState<PlanTier | null>(null);
 
   const refresh = () => {
     fetchPlan().then(setPlan).catch(() => {});
@@ -26,14 +28,26 @@ function BillingPage() {
   useEffect(refresh, []);
 
   const upgrade = async (tier: PlanTier) => {
+    if (tier === "free") {
+      try {
+        await switchPlan({ data: { tier } });
+        toast.success("Downgraded to Free");
+        refresh();
+      } catch (e: any) {
+        toast.error(e?.message ?? "Failed");
+      }
+      return;
+    }
+    setLoadingTier(tier);
     try {
-      await switchPlan({ data: { tier } });
-      toast.success(`Switched to ${PLANS[tier].name}`);
-      refresh();
+      const { url } = await checkout({ data: { tier } });
+      window.location.href = url;
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to switch plan");
+      toast.error(e?.message ?? "Checkout failed");
+      setLoadingTier(null);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[#f7f7f5]">
@@ -90,7 +104,7 @@ function BillingPage() {
                   ))}
                 </ul>
                 <button
-                  disabled={current}
+                  disabled={current || loadingTier === t}
                   onClick={() => upgrade(t)}
                   className={cn(
                     "mt-4 w-full py-2 rounded-lg text-sm font-medium",
@@ -101,7 +115,13 @@ function BillingPage() {
                         : "bg-violet text-white hover:bg-violet/90",
                   )}
                 >
-                  {current ? "Current plan" : t === "free" ? "Downgrade" : `Upgrade to ${p.name}`}
+                  {current
+                    ? "Current plan"
+                    : loadingTier === t
+                      ? "Redirecting…"
+                      : t === "free"
+                        ? "Downgrade"
+                        : `Upgrade to ${p.name}`}
                 </button>
               </div>
             );
@@ -109,8 +129,9 @@ function BillingPage() {
         </div>
 
         <div className="text-xs text-muted-foreground mb-2">
-          Payments via Dodo coming soon — for now this switches your plan instantly so you can test.
+          Secure payments by Dodo. Subscriptions activate instantly after checkout.
         </div>
+
 
         <h2 className="font-semibold text-lg mb-3 mt-8">Recent activity</h2>
         <div className="bg-white border rounded-2xl divide-y">
