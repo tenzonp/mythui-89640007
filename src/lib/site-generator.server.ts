@@ -1,39 +1,33 @@
 // Server-only AI site generator. Calls the Lovable AI Gateway and asks for a
-// strict JSON array of files for a Next.js 14 (app router) project.
+// strict JSON array of files for a fully-static website (HTML/CSS/JS, no
+// build step). The output is uploaded as-is to Netlify for instant serving.
 
 export type GeneratedFile = { path: string; content: string };
 
-const SYSTEM_PROMPT = `You are a senior front-end architect. Given a user's idea, you produce a COMPLETE, production-ready Next.js 14 (app router) website that is futuristic, original, visually striking, and ready to deploy to Vercel.
+const SYSTEM_PROMPT = `You are a senior front-end architect. Given a user's idea, you produce a COMPLETE, production-ready STATIC website (plain HTML + CSS + vanilla JS) that is futuristic, original, visually striking, and ready to serve directly from a CDN. No build step. No frameworks. No npm.
 
 HARD REQUIREMENTS:
 - Output ONLY valid JSON matching the requested schema. No prose, no markdown fences.
-- Project must use Next.js 14 app router with TypeScript and Tailwind CSS v3.
-- Use ONLY these dependencies (pin versions exactly):
-  next 14.2.5, react 18.3.1, react-dom 18.3.1, typescript 5.5.4,
-  tailwindcss 3.4.10, postcss 8.4.41, autoprefixer 10.4.20,
-  @types/react 18.3.3, @types/react-dom 18.3.0, @types/node 20.14.10,
-  framer-motion 11.3.19, lucide-react 0.427.0, clsx 2.1.1
-- next.config.mjs must include images.remotePatterns allowing images.unsplash.com, images.pexels.com, cdn.pixabay.com, plus generic https. Example:
-  /** @type {import('next').NextConfig} */
-  export default { images: { remotePatterns: [{ protocol: "https", hostname: "**" }] } };
-- tsconfig.json strict: true, moduleResolution "bundler".
-- No env vars, no API routes that require secrets.
-- Keep total files <= 24.
-- Always include: package.json, tsconfig.json, next.config.mjs, postcss.config.js, tailwind.config.ts, app/globals.css, app/layout.tsx, app/page.tsx.
+- The site MUST be a static site: index.html at the root, plus styles.css, optional script.js, and optional extra .html pages (about.html, contact.html, etc).
+- ALWAYS include "index.html" at the project root.
+- index.html must include <!doctype html>, <meta name="viewport" ...>, a unique <title>, and a <meta name="description">.
+- Pull CSS resets and fonts from CDNs in <link> tags. Use Google Fonts via <link href="https://fonts.googleapis.com/..."> for custom typography pairings.
+- For icons use lucide via CDN: <script src="https://unpkg.com/lucide@latest"></script> then <i data-lucide="..."></i> + <script>lucide.createIcons()</script>.
+- For animations, use CSS keyframes + small vanilla JS (IntersectionObserver, requestAnimationFrame). You may use GSAP via CDN if helpful: <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>.
+- Keep total files <= 12.
+- Add a "_redirects" file at root with the single line "/*    /index.html   200" only if you create extra HTML pages and want SPA fallback; otherwise omit it (multi-page static works fine on Netlify by default).
 
 INTERNET ASSETS — USE THEM LIBERALLY:
-- Images: pull real photography from Unsplash (https://images.unsplash.com/photo-...) or Pexels (https://images.pexels.com/photos/...). Pick URLs you are confident exist. Use Next.js <Image /> with width/height. Provide descriptive alt text.
-- Icons: import from lucide-react (already a dependency).
-- Animations: prefer framer-motion. You may also embed a Lottie animation by URL via <DotLottieReact src="https://lottie.host/..." /> only if you also add @lottiefiles/dotlottie-react to dependencies (otherwise skip Lottie).
-- Videos: embed YouTube or Vimeo via <iframe>, or use <video> with a public MP4 URL from coverr.co / mixkit.co / pexels.com videos. Always include controls or autoPlay + muted + playsInline + loop for background video.
+- Images: pull real photography from Unsplash (https://images.unsplash.com/photo-...?w=1600&q=80) or Pexels. Use descriptive alt text. Use loading="lazy" on below-the-fold images.
+- Videos: embed YouTube/Vimeo via <iframe>, or <video autoplay muted playsinline loop> with a public MP4 from coverr.co / mixkit.co.
 - Backgrounds: gradients, CSS, SVG, and real internet photography are all encouraged.
 
 DESIGN QUALITY:
-- Futuristic, awwwards-grade. Bold hero, custom typography pairings (Google Fonts via next/font), real micro-interactions via framer-motion, semantic sections (header, hero, features, social proof, CTA, footer), accessibility, mobile-first responsive.
+- Futuristic, awwwards-grade. Bold hero, custom typography pairings, real micro-interactions, semantic sections (header, hero, features, social proof, CTA, footer), accessibility, mobile-first responsive.
 - Realistic copy tailored to the user's idea and business knowledge — no lorem ipsum.
 
 OUTPUT JSON SCHEMA:
-{ "files": [ { "path": "string (relative)", "content": "string" } ] }`;
+{ "files": [ { "path": "string (relative, e.g. index.html)", "content": "string" } ] }`;
 
 export async function generateSiteFiles(opts: {
   name: string;
@@ -89,8 +83,8 @@ ${opts.businessContext ? `\nBUSINESS CONTEXT (use to write real, tailored copy):
   const cleaned: GeneratedFile[] = files
     .filter((f: any) => f && typeof f.path === "string" && typeof f.content === "string")
     .map((f: any) => ({ path: String(f.path).replace(/^\/+/, ""), content: String(f.content) }));
-  if (!cleaned.some((f) => f.path === "package.json")) {
-    throw new Error("AI output missing package.json");
+  if (!cleaned.some((f) => f.path === "index.html")) {
+    throw new Error("AI output missing index.html");
   }
   return cleaned;
 }
