@@ -7,7 +7,8 @@ import {
   createThread,
   deleteThread,
 } from "@/lib/chat.functions";
-import { getMyPlan } from "@/lib/credits.functions";
+import { getMyPlan, getMyLedger } from "@/lib/credits.functions";
+import { WYNSA_MODELS } from "@/lib/plans";
 import {
   Plus,
   Trash2,
@@ -319,6 +320,12 @@ function RightSidebar() {
       <section className="px-3 pb-3">
         <CreditsCard />
       </section>
+
+      {/* Usage breakdown */}
+      <section className="px-3 pb-3">
+        <UsageBreakdown />
+      </section>
+
 
       {/* Recent Artifacts */}
       <section className="px-3 pb-3">
