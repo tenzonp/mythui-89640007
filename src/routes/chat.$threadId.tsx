@@ -9,6 +9,7 @@ import {
   deleteMessage,
   listInstagramPendingReplies,
 } from "@/lib/chat.functions";
+import { uploadAttachment } from "@/lib/uploads.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowUp,
@@ -26,6 +27,12 @@ import {
   Brain,
   CheckCircle2,
   AlertCircle,
+  Paperclip,
+  Download,
+  X,
+  FileText,
+  Image as ImageIcon,
+  File as FileIcon,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "@tanstack/react-router";
@@ -142,6 +149,12 @@ function ChatWindow({
   const fnDeleteMsg = useServerFn(deleteMessage);
 
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<
+    { name: string; url: string; mime: string; size: number; isImage: boolean }[]
+  >([]);
+  const [uploading, setUploading] = useState(false);
+  const fnUpload = useServerFn(uploadAttachment);
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -157,11 +170,55 @@ function ChatWindow({
     if (status === "ready") onRefreshPendingInstagram();
   }, [status]);
 
+  const onPickFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const next = [...attachments];
+      for (const f of Array.from(files).slice(0, 6)) {
+        if (f.size > 20 * 1024 * 1024) {
+          toast.error(`${f.name} is over 20MB`);
+          continue;
+        }
+        const buf = await f.arrayBuffer();
+        let bin = "";
+        const u8 = new Uint8Array(buf);
+        for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
+        const dataBase64 = btoa(bin);
+        try {
+          const r = await fnUpload({
+            data: { name: f.name, dataBase64, mime: f.type || undefined },
+          });
+          next.push(r);
+        } catch (e: any) {
+          toast.error(e?.message ?? "Upload failed");
+        }
+      }
+      setAttachments(next);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   const submit = async () => {
     const text = input.trim();
-    if (!text || status === "submitted" || status === "streaming") return;
+    if ((!text && attachments.length === 0) || status === "submitted" || status === "streaming")
+      return;
+    const atts = attachments;
+    const attLines = atts.length
+      ? "\n\n📎 Attached files (use run_code with `requests` to download/inspect, or web_fetch for text URLs):\n" +
+        atts.map((a) => `- ${a.name} (${a.mime}) — ${a.url}`).join("\n")
+      : "";
+    const parts: any[] = [{ type: "text", text: (text || "(see attached files)") + attLines }];
+    for (const a of atts) {
+      if (a.isImage) {
+        parts.push({ type: "file", url: a.url, mediaType: a.mime, filename: a.name });
+      }
+    }
     setInput("");
-    await sendMessage({ text });
+    setAttachments([]);
+    await sendMessage({ parts });
   };
 
   const busy = status === "submitted" || status === "streaming";
@@ -258,6 +315,31 @@ function ChatWindow({
       <div className="border-t bg-background">
         <div className="max-w-[760px] mx-auto p-4">
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-2 pb-0">
+                {attachments.map((a, i) => (
+                  <div
+                    key={i}
+                    className="group relative flex items-center gap-2 border rounded-lg px-2 py-1.5 text-xs bg-muted/40"
+                  >
+                    {a.isImage ? (
+                      <img src={a.url} alt={a.name} className="w-8 h-8 rounded object-cover" />
+                    ) : (
+                      <FileIcon className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <span className="max-w-[160px] truncate">{a.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachments((p) => p.filter((_, j) => j !== i))}
+                      className="opacity-60 hover:opacity-100"
+                      aria-label="Remove"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               ref={taRef}
               value={input}
@@ -270,12 +352,33 @@ function ChatWindow({
               }}
               rows={1}
               placeholder="Ask your AI team anything…"
-              className="w-full resize-none bg-transparent px-4 py-3.5 pr-14 text-sm outline-none max-h-48"
+              className="w-full resize-none bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none max-h-48"
+            />
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => onPickFiles(e.target.files)}
             />
             <button
               type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="absolute left-2 bottom-2 w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-accent text-muted-foreground disabled:opacity-40"
+              aria-label="Attach files"
+              title="Attach files (images, PDFs, CSVs…)"
+            >
+              {uploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Paperclip className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              type="button"
               onClick={submit}
-              disabled={busy || !input.trim()}
+              disabled={busy || (!input.trim() && attachments.length === 0)}
               className="absolute right-2 bottom-2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
               aria-label="Send"
             >
@@ -287,7 +390,7 @@ function ChatWindow({
             </button>
           </div>
           <p className="text-[11px] text-muted-foreground text-center mt-2">
-            Mythmind can use your connected integrations to take real actions.
+            Mythmind can read your attachments, see images, and ship real files back.
           </p>
         </div>
       </div>
@@ -345,16 +448,56 @@ function InstagramPendingBanner({ pending }: { pending: any[] }) {
   );
 }
 
+function renderFileParts(parts: any[]) {
+  const files = parts.filter(
+    (p) => p.type === "file" && typeof p.url === "string",
+  );
+  if (!files.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {files.map((f, i) =>
+        (f.mediaType ?? "").startsWith("image/") ? (
+          <a key={i} href={f.url} target="_blank" rel="noreferrer">
+            <img
+              src={f.url}
+              alt={f.filename ?? "image"}
+              className="max-h-48 rounded-lg border object-cover"
+            />
+          </a>
+        ) : (
+          <a
+            key={i}
+            href={f.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 border rounded-lg px-3 py-2 text-xs bg-muted/30 hover:bg-accent"
+          >
+            <FileIcon className="w-4 h-4" />
+            <span className="max-w-[200px] truncate">{f.filename ?? "file"}</span>
+          </a>
+        ),
+      )}
+    </div>
+  );
+}
+
 function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
-  const text = m.parts.map((p: any) => (p.type === "text" ? p.text : "")).join("");
+  const visibleText = m.parts
+    .map((p: any) => (p.type === "text" ? p.text : ""))
+    .join("")
+    .replace(/\n\n📎 Attached files[\s\S]*$/, "")
+    .trim();
 
   if (m.role === "user") {
     return (
-      <div className="group flex flex-col items-end gap-1">
-        <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
-          {text}
-        </div>
-        <MessageActions text={text} onDelete={onDelete} role="user" />
+      <div className="group flex flex-col items-end gap-1 max-w-full">
+        {renderFileParts(m.parts as any[])}
+        {visibleText && (
+          <div className="max-w-[80%] rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
+            {visibleText}
+          </div>
+        )}
+        <MessageActions text={visibleText} onDelete={onDelete} role="user" />
       </div>
     );
   }
@@ -373,7 +516,7 @@ function Message({ m, onDelete }: { m: UIMessage; onDelete: () => void }) {
         }
         return null;
       })}
-      <MessageActions text={text} onDelete={onDelete} role="assistant" />
+      <MessageActions text={visibleText} onDelete={onDelete} role="assistant" />
     </div>
   );
 }
@@ -470,11 +613,44 @@ function ToolCall({ part }: { part: any }) {
   return <GenericToolCall part={part} name={name} />;
 }
 
+function ArtifactCard({ a }: { a: any }) {
+  const isImage = (a.mime ?? "").startsWith("image/");
+  const isPdf = (a.mime ?? "").includes("pdf");
+  const sizeKb = a.size ? `${(a.size / 1024).toFixed(1)} KB` : "";
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noreferrer"
+      download={a.name}
+      className="flex items-center gap-3 border rounded-xl px-3 py-2.5 bg-background hover:bg-accent transition-colors group/card"
+    >
+      <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        {isImage ? (
+          <ImageIcon className="w-5 h-5" />
+        ) : isPdf ? (
+          <FileText className="w-5 h-5" />
+        ) : (
+          <FileIcon className="w-5 h-5" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate">{a.name}</div>
+        <div className="text-[11px] text-muted-foreground">
+          {a.mime} {sizeKb && `· ${sizeKb}`}
+        </div>
+      </div>
+      <Download className="w-4 h-4 text-muted-foreground group-hover/card:text-foreground" />
+    </a>
+  );
+}
+
 function GenericToolCall({ part, name }: { part: any; name: string }) {
   const [open, setOpen] = useState(false);
   const state = part.state ?? "input-streaming";
   const queued = part.output?.status === "queued";
   const blocked = part.output?.status === "blocked" || part.output?.blocker;
+  const artifacts: any[] = Array.isArray(part.output?.artifacts) ? part.output.artifacts : [];
   const statusLabel = queued
     ? "Queued"
     : blocked
@@ -485,36 +661,50 @@ function GenericToolCall({ part, name }: { part: any; name: string }) {
           ? "Error"
           : "Running…";
   return (
-    <div className="border rounded-xl bg-muted/30">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs"
-      >
-        <span className="flex items-center gap-2">
-          <Wrench className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="font-mono">{name}</span>
-          <span className="text-muted-foreground">· {statusLabel}</span>
-        </span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="px-3 pb-3 text-xs space-y-2">
-          {part.input && (
-            <pre className="bg-background rounded p-2 overflow-auto max-h-48">
-              {JSON.stringify(part.input, null, 2)}
-            </pre>
-          )}
-          {part.output &&
-            (part.output?.message ? (
-              <div className="bg-background rounded p-2 text-muted-foreground">
-                {String(part.output.message)}
-              </div>
-            ) : (
-              <pre className="bg-background rounded p-2 overflow-auto max-h-64">
-                {JSON.stringify(part.output, null, 2)}
+    <div className="space-y-2">
+      <div className="border rounded-xl bg-muted/30">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 text-xs"
+        >
+          <span className="flex items-center gap-2">
+            <Wrench className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="font-mono">{name}</span>
+            <span className="text-muted-foreground">· {statusLabel}</span>
+            {artifacts.length > 0 && (
+              <span className="text-muted-foreground">
+                · {artifacts.length} file{artifacts.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </span>
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <div className="px-3 pb-3 text-xs space-y-2">
+            {part.input && (
+              <pre className="bg-background rounded p-2 overflow-auto max-h-48">
+                {JSON.stringify(part.input, null, 2)}
               </pre>
-            ))}
+            )}
+            {part.output &&
+              (part.output?.message ? (
+                <div className="bg-background rounded p-2 text-muted-foreground">
+                  {String(part.output.message)}
+                </div>
+              ) : (
+                <pre className="bg-background rounded p-2 overflow-auto max-h-64">
+                  {JSON.stringify(part.output, null, 2)}
+                </pre>
+              ))}
+          </div>
+        )}
+      </div>
+      {artifacts.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          {artifacts.map((a, i) => (
+            <ArtifactCard key={i} a={a} />
+          ))}
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 import {
   createDeepSeekProvider,
+  createLovableAiGatewayProvider,
   DEEPSEEK_MAIN_MODEL,
   DEEPSEEK_SUB_MODEL,
   pickDeepSeekModel,
@@ -696,8 +697,30 @@ export const Route = createFileRoute("/api/chat")({
           isDelegated: false,
           toolCount: Object.keys(aiTools).length,
         });
-        console.log("[chat] DeepSeek model selected:", chosenModel);
-        const model = deepseek(chosenModel);
+
+        // Detect image attachments in the latest user turn — DeepSeek can't see
+        // images, so route those turns through the Lovable AI Gateway (Gemini).
+        const hasImageAttachment = (() => {
+          for (let i = body.messages.length - 1; i >= 0; i--) {
+            const m = body.messages[i] as any;
+            if (m.role !== "user") continue;
+            const parts: any[] = m.parts ?? [];
+            return parts.some(
+              (p) => p?.type === "file" && typeof p.mediaType === "string" && p.mediaType.startsWith("image/"),
+            );
+          }
+          return false;
+        })();
+
+        let model: any;
+        if (hasImageAttachment && process.env.LOVABLE_API_KEY) {
+          const gateway = createLovableAiGatewayProvider(process.env.LOVABLE_API_KEY);
+          model = gateway("google/gemini-3-flash-preview");
+          console.log("[chat] Vision routing → gemini-3-flash-preview");
+        } else {
+          console.log("[chat] DeepSeek model selected:", chosenModel);
+          model = deepseek(chosenModel);
+        }
 
         const result = streamText({
           model,
