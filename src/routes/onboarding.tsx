@@ -118,11 +118,9 @@ function OnboardingPage() {
       {/* Progress neuron bar */}
       <div className="relative z-10 px-6">
         <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-          <motion.div
+          <div
             className="h-full bg-gradient-to-r from-violet-500 via-fuchsia-400 to-amber-300"
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ type: "spring", damping: 25, stiffness: 120 }}
+            style={{ width: `${pct}%`, transition: "width 500ms cubic-bezier(0.22, 1, 0.36, 1)" }}
           />
         </div>
         <div className="mt-1.5 flex justify-between text-[10px] uppercase tracking-widest text-white/30">
@@ -284,28 +282,20 @@ function BackdropFX() {
 }
 
 function FloatingOrbs() {
-  const orbs = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    s: 100 + Math.random() * 240,
-    d: 6 + Math.random() * 8,
-  })), []);
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {orbs.map((o) => (
-        <motion.div
+      {ORBS.map((o) => (
+        <div
           key={o.id}
-          className="absolute rounded-full blur-3xl"
+          className="absolute rounded-full blur-3xl animate-pulse"
           style={{
             left: `${o.x}%`,
             top: `${o.y}%`,
             width: o.s,
             height: o.s,
             background: o.id % 2 ? "rgba(167,139,250,0.18)" : "rgba(244,114,182,0.14)",
+            animationDuration: `${o.d}s`,
           }}
-          animate={{ x: [0, 40, -20, 0], y: [0, -30, 20, 0] }}
-          transition={{ duration: o.d, repeat: Infinity, ease: "easeInOut" }}
         />
       ))}
     </div>
