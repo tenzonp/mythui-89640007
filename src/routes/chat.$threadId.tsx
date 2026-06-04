@@ -504,7 +504,7 @@ function ChatWindow({
           <div className="relative rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
-                {attachments.map((a, i) => {
+                {attachments.map((a) => {
                   const ext = (a.mime ?? "").split("/").pop()?.toUpperCase();
                   const meta = [
                     ext,
@@ -515,34 +515,65 @@ function ChatWindow({
                     .join(" · ");
                   return (
                     <div
-                      key={i}
-                      className="group relative flex items-center gap-2 border rounded-lg pl-1.5 pr-2 py-1 text-xs bg-muted/40"
+                      key={a.id}
+                      className="group relative flex items-center gap-2 border rounded-lg pl-1.5 pr-2 py-1 text-xs bg-muted/40 overflow-hidden"
                     >
-                      {a.isImage ? (
-                        <img
-                          src={a.url}
-                          alt={a.name}
-                          className="w-8 h-8 rounded object-cover"
-                        />
-                      ) : a.isPdf ? (
-                        <FileText className="w-4 h-4 text-muted-foreground mx-1" />
-                      ) : (
-                        <FileIcon className="w-4 h-4 text-muted-foreground mx-1" />
-                      )}
+                      <div className="relative w-8 h-8 rounded overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                        {a.thumbnail ? (
+                          <img src={a.thumbnail} alt="" className="w-full h-full object-cover" />
+                        ) : a.isPdf ? (
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                        ) : a.isVideo ? (
+                          <VideoIcon className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <FileIcon className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        {a.isVideo && a.thumbnail && (
+                          <Play className="w-3 h-3 text-white absolute inset-0 m-auto drop-shadow" />
+                        )}
+                      </div>
                       <div className="min-w-0">
                         <div className="max-w-[160px] truncate">{a.name}</div>
-                        <div className="text-[10px] text-muted-foreground">{meta}</div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          {a.status === "uploading" && (
+                            <>
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              {Math.round(a.progress)}%
+                            </>
+                          )}
+                          {a.status === "ready" && meta}
+                          {a.status === "error" && (
+                            <span className="text-destructive">Failed</span>
+                          )}
+                        </div>
                       </div>
+                      {a.status === "error" && (
+                        <button
+                          type="button"
+                          onClick={() => retryAtt(a.id)}
+                          className="opacity-70 hover:opacity-100"
+                          aria-label="Retry"
+                          title="Retry upload"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
-                          setAttachments((p) => p.filter((_, j) => j !== i))
+                          setAttachments((p) => p.filter((x) => x.id !== a.id))
                         }
                         className="opacity-60 hover:opacity-100"
                         aria-label="Remove"
                       >
                         <X className="w-3 h-3" />
                       </button>
+                      {a.status === "uploading" && (
+                        <div
+                          className="absolute bottom-0 left-0 h-0.5 bg-primary transition-all"
+                          style={{ width: `${a.progress}%` }}
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -552,6 +583,7 @@ function ChatWindow({
               ref={taRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={onPaste}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -559,7 +591,7 @@ function ChatWindow({
                 }
               }}
               rows={1}
-              placeholder="Ask your AI team anything…"
+              placeholder="Ask your AI team anything… (drag & drop or paste files)"
               className="w-full resize-none bg-transparent px-4 py-3.5 pl-12 pr-14 text-sm outline-none max-h-48"
             />
             <input
@@ -567,7 +599,7 @@ function ChatWindow({
               type="file"
               multiple
               hidden
-              onChange={(e) => onPickFiles(e.target.files)}
+              onChange={(e) => addFiles(e.target.files)}
             />
             <button
               type="button"
