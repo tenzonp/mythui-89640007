@@ -133,35 +133,53 @@ export type Database = {
       }
       business_team_members: {
         Row: {
+          accepted_at: string | null
           created_at: string
           email: string | null
           id: string
+          invite_token: string | null
+          invited_at: string | null
+          member_user_id: string | null
           name: string
           notes: string | null
+          permissions: string[]
           phone: string | null
           role: string | null
+          status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          accepted_at?: string | null
           created_at?: string
           email?: string | null
           id?: string
+          invite_token?: string | null
+          invited_at?: string | null
+          member_user_id?: string | null
           name: string
           notes?: string | null
+          permissions?: string[]
           phone?: string | null
           role?: string | null
+          status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          accepted_at?: string | null
           created_at?: string
           email?: string | null
           id?: string
+          invite_token?: string | null
+          invited_at?: string | null
+          member_user_id?: string | null
           name?: string
           notes?: string | null
+          permissions?: string[]
           phone?: string | null
           role?: string | null
+          status?: string
           updated_at?: string
           user_id?: string
         }
