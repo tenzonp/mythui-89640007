@@ -575,7 +575,7 @@ async function resolveConnectedFacebookPage(
   const res = await executeTool("FACEBOOK_GET_USER_PAGES", userId, {});
   const pages = extractFacebookPages(res);
   const requested = preferredPageId ? String(preferredPageId).trim() : "";
-  const page = (requested && pages.find((p) => p.id === requested)) || pages[0];
+  const page = (requested && pages.find((p: FacebookPageInfo) => p.id === requested)) || pages[0];
   if (page?.id) {
     assertFacebookPageCanPublish(page);
     return page;
