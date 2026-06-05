@@ -320,8 +320,11 @@ function Dashboard() {
               <div>
                 <h2 className="font-serif text-2xl mb-5">Recent work</h2>
                 <div className="rounded-xl border bg-card p-5 space-y-4">
+                  {recentTasks.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No work yet — start a chat to put your AI team to work.</p>
+                  )}
                   {recentTasks.map((task) => (
-                    <div key={task.title} className="flex items-start gap-3">
+                    <div key={task.id} className="flex items-start gap-3">
                       <div
                         className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
                           task.status === "done" ? "bg-green-500" : "bg-amber-500"
