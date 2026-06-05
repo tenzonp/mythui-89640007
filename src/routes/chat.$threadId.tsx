@@ -1536,8 +1536,21 @@ function WebsiteBuildCard({ part }: { part: any }) {
   const elapsedLabel = mins > 0 ? `${mins}m ${rem}s` : `${secs}s`;
 
   return (
-    <div className="border rounded-2xl overflow-hidden bg-gradient-to-br from-violet/5 via-background to-background">
-      <div className="px-4 py-3 flex items-center gap-3 border-b bg-background/60">
+    <div className="relative border rounded-2xl overflow-hidden bg-gradient-to-br from-violet/5 via-background to-background">
+      {/* Blueprint grid backdrop when running */}
+      {running && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+          }}
+        />
+      )}
+
+      <div className="relative px-4 py-3 flex items-center gap-3 border-b bg-background/60 backdrop-blur">
         <div className="relative shrink-0">
           {reyes?.image ? (
             <img src={reyes.image} alt={reyes.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-violet/30" />
@@ -1551,12 +1564,13 @@ function WebsiteBuildCard({ part }: { part: any }) {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium truncate">
-            {siteName ? `Website · ${siteName}` : "Website build"}
+          <div className="text-sm font-medium truncate flex items-center gap-1.5">
+            {siteName ? `Constructing · ${siteName}` : "Constructing your site"}
+            {running && <span className="inline-block w-1.5 h-3 bg-violet/80 animate-pulse" />}
           </div>
           <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
             <span className={`w-1.5 h-1.5 rounded-full ${statusColor} ${running ? "animate-pulse" : ""}`} />
-            <span>{statusLabel}</span>
+            <span>{running ? "Hold on, crafting…" : statusLabel}</span>
             <span>·</span>
             <span>{reyes?.name ?? "Reyes"} — {reyes?.role ?? "Product & Innovation"}</span>
             {running && <><span>·</span><span className="tabular-nums">{elapsedLabel}</span></>}
@@ -1564,16 +1578,21 @@ function WebsiteBuildCard({ part }: { part: any }) {
           </div>
         </div>
       </div>
+
       {input?.prompt && (
-        <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+        <div className="relative px-4 py-2 text-xs text-muted-foreground border-b">
           <span className="font-medium text-foreground">Brief: </span>
           {String(input.prompt).slice(0, 220)}
           {String(input.prompt).length > 220 ? "…" : ""}
         </div>
       )}
 
+      {running && (
+        <BuildConsole stepKey={BUILD_STEPS[activeIdx]?.key ?? "brief"} siteName={siteName} />
+      )}
+
       {(running || failed) && (
-        <div className="px-4 py-3 border-b">
+        <div className="relative px-4 py-3 border-b">
           <ol className="space-y-1.5">
             {BUILD_STEPS.map((s, i) => {
               const done = i < activeIdx;
