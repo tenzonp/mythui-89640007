@@ -59,11 +59,16 @@ function Page() {
               )}
               <h3 className="font-serif text-3xl mb-2">{p.name}</h3>
               <p className="text-sm text-muted-foreground mb-6">{p.blurb}</p>
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="font-serif text-5xl">{p.priceLabel.split("/")[0]}</span>
-                {p.priceLabel.includes("/") && (
-                  <span className="text-muted-foreground text-sm">
-                    /{p.priceLabel.split("/")[1]}
+              <div className="mb-2">
+                <span className="font-serif text-5xl">{p.priceLabel}</span>
+                {tier === "pro" && (
+                  <span className="ml-2 text-sm font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    Launch offer
+                  </span>
+                )}
+                {tier === "everest" && (
+                  <span className="ml-2 text-sm font-medium text-violet bg-violet/10 px-2 py-0.5 rounded-full">
+                    Just one tap away
                   </span>
                 )}
               </div>
