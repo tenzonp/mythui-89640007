@@ -78,10 +78,10 @@ export const PLANS: Record<
   pro: {
     id: "pro",
     name: "Pro",
-    priceLabel: "$29/mo",
+    priceLabel: "Free",
     monthlyCredits: 15000,
     dailyFreeCredits: 0,
-    blurb: "For founders shipping every day.",
+    blurb: "Launch offer — grab it now.",
     perks: [
       "15,000 credits / month",
       "All Wynsa models (Lady, Yeti, Mt.)",
@@ -93,10 +93,10 @@ export const PLANS: Record<
   everest: {
     id: "everest",
     name: "Everest",
-    priceLabel: "$99/mo",
+    priceLabel: "$1.99",
     monthlyCredits: 40000,
     dailyFreeCredits: 0,
-    blurb: "Replace a small team. Run heavy workflows.",
+    blurb: "Just one tap away.",
     perks: [
       "40,000 credits / month",
       "All Wynsa models",
