@@ -4,8 +4,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyPlan, getMyLedger } from "@/lib/credits.functions";
 import { PLANS, WYNSA_MODELS } from "@/lib/plans";
-import { ArrowLeft, Sparkles, CreditCard, LogOut, User } from "lucide-react";
+import { ArrowLeft, Sparkles, CreditCard, LogOut, User, UserPlus, Users, Copy, Send, Trash2, Check, Loader2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { listTeam, inviteTeamMember, removeTeamMember, resendInviteSms } from "@/lib/team.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({ meta: [{ title: "Profile · Mythmind" }] }),
