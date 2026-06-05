@@ -480,6 +480,18 @@ function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
       if (!schema.required.length) delete schema.required;
     }
   }
+  if (toolkitSlug?.toLowerCase() === "facebook" && schema.properties?.page_id) {
+    schema.properties = { ...schema.properties };
+    schema.properties.page_id = {
+      ...schema.properties.page_id,
+      description:
+        "Optional. Leave blank to use the Facebook Page already connected in Integrations. Do not ask the user for this ID when Facebook is connected.",
+    };
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.filter((key: string) => key !== "page_id");
+      if (!schema.required.length) delete schema.required;
+    }
+  }
   if (toolkitSlug?.toLowerCase() === "gmail" && schema.properties?.attachment) {
     schema.properties = { ...schema.properties };
     schema.properties.attachment = {
