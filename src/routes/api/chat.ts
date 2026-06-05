@@ -911,7 +911,7 @@ export const Route = createFileRoute("/api/chat")({
             const { sendAakashSMS } = await import("@/lib/aakash.server");
             const results: any[] = [];
             for (const m of targets) {
-              const r = await sendAakashSMS({ to: m.phone, text: parsed.data.message });
+              const r = await sendAakashSMS({ to: m.phone!, text: parsed.data.message });
               results.push({ id: m.id, name: m.name, phone: m.phone, ok: r.ok, error: r.error });
             }
             return {
