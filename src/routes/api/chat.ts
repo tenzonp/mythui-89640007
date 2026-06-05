@@ -480,6 +480,18 @@ function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
       if (!schema.required.length) delete schema.required;
     }
   }
+  if (toolkitSlug?.toLowerCase() === "facebook" && schema.properties?.page_id) {
+    schema.properties = { ...schema.properties };
+    schema.properties.page_id = {
+      ...schema.properties.page_id,
+      description:
+        "Optional. Leave blank to use the Facebook Page already connected in Integrations. Do not ask the user for this ID when Facebook is connected.",
+    };
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.filter((key: string) => key !== "page_id");
+      if (!schema.required.length) delete schema.required;
+    }
+  }
   if (toolkitSlug?.toLowerCase() === "gmail" && schema.properties?.attachment) {
     schema.properties = { ...schema.properties };
     schema.properties.attachment = {
@@ -520,6 +532,21 @@ async function resolveConnectedInstagramAccount(userId: string) {
     accountType: firstStringByKeys(data, ["account_type"]),
   };
 }
+
+async function resolveConnectedFacebookPage(userId: string): Promise<{ id: string; name?: string | null }> {
+  const res = await executeTool("FACEBOOK_GET_USER_PAGES", userId, {});
+  const data = (res as any)?.data ?? res;
+  const pages =
+    (data?.data && Array.isArray(data.data) && data.data) ||
+    (Array.isArray(data) && data) ||
+    (data?.pages && Array.isArray(data.pages) && data.pages) ||
+    [];
+  const first = pages[0];
+  const id = first?.id || firstStringByKeys(data, ["page_id", "id"]);
+  if (!id) throw new Error("No Facebook Page found on the connected account.");
+  return { id: String(id), name: first?.name ?? null };
+}
+
 
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin: string) {
   const out: Record<string, any> = {};
@@ -798,6 +825,22 @@ async function prepareComposioArgs(t: ComposioTool, args: any, userId: string, o
     }
     return next;
   }
+  if (toolkit === "facebook") {
+    const next = { ...(args ?? {}) };
+    const hasPageIdParam = Boolean((t.input_parameters as any)?.properties?.page_id);
+    if (hasPageIdParam && (!next.page_id || !/^\d+$/.test(String(next.page_id)))) {
+      try {
+        const page = await resolveConnectedFacebookPage(userId);
+        next.page_id = page.id;
+      } catch (e) {
+        // leave as-is; tool will error and AI can surface it
+      }
+    }
+    for (const key of ["image_url", "video_url", "url", "source"]) {
+      if (next[key]) next[key] = absolutizeUrl(next[key], origin);
+    }
+    return next;
+  }
   if (toolkit !== "gmail") return args ?? {};
   const next = { ...(args ?? {}) };
   const attachmentSource = next.attachment ?? findStoredImageUrlInHtml(next);
@@ -888,6 +931,7 @@ TEAM SMS: You have a send_team_sms tool. When the user says things like "send th
 IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to post or email that image, reuse the SAME artifact url. For Gmail, pass the artifact url/object in the attachment field; do NOT invent or reuse an s3key. The app stages the file for Gmail automatically. Do not embed /api/files images as HTML img tags because Gmail cannot fetch private chat URLs.
 
 INSTAGRAM POSTING: When Instagram is connected and the user asks to post/upload to their main/connected account, DO NOT ask for an Instagram Business Account ID. Use the connected account automatically. For image posts, generate or reuse the artifact URL, call the Instagram media-container tool with image_url + caption, then publish it with the returned creation_id. Local/generated PNG files are automatically converted to Instagram-ready JPEG URLs, so do not regenerate repeatedly after an unsupported-format error. If a tool asks for ig_user_id, leave it blank or use the connected account; never pass a username like mythmind_ai as the ID.
+FACEBOOK POSTING: When Facebook is connected and the user asks to post to their page, DO NOT ask for a Facebook Page ID. Leave page_id blank — the system auto-resolves the connected Page via FACEBOOK_GET_USER_PAGES. Never pass a numeric ID the user typed unless they explicitly insist; user-provided numeric IDs are often the personal user id which Facebook rejects with "global id ... is not allowed for this call".
 
 ${scopeNote}
 ${missingNote}
