@@ -30,6 +30,7 @@ import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as AiEmployeesIndexRouteImport } from './routes/ai-employees.index'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as SitesSiteIdRouteImport } from './routes/sites.$siteId'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as GrowAdminRouteImport } from './routes/grow.admin'
 import { Route as ChatThreadIdRouteImport } from './routes/chat.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -143,6 +144,11 @@ const SitesSiteIdRoute = SitesSiteIdRouteImport.update({
   path: '/$siteId',
   getParentRoute: () => SitesRoute,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GrowAdminRoute = GrowAdminRouteImport.update({
   id: '/grow/admin',
   path: '/grow/admin',
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/grow/admin': typeof GrowAdminRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/sites/$siteId': typeof SitesSiteIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
@@ -231,6 +238,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/grow/admin': typeof GrowAdminRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/sites/$siteId': typeof SitesSiteIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/ai-employees': typeof AiEmployeesIndexRoute
@@ -262,6 +270,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/chat/$threadId': typeof ChatThreadIdRoute
   '/grow/admin': typeof GrowAdminRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/sites/$siteId': typeof SitesSiteIdRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/ai-employees/': typeof AiEmployeesIndexRoute
@@ -294,6 +303,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/chat/$threadId'
     | '/grow/admin'
+    | '/invite/$token'
     | '/sites/$siteId'
     | '/support/$ticketId'
     | '/ai-employees/'
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/chat/$threadId'
     | '/grow/admin'
+    | '/invite/$token'
     | '/sites/$siteId'
     | '/support/$ticketId'
     | '/ai-employees'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/chat/$threadId'
     | '/grow/admin'
+    | '/invite/$token'
     | '/sites/$siteId'
     | '/support/$ticketId'
     | '/ai-employees/'
@@ -383,6 +395,7 @@ export interface RootRouteChildren {
   AiEmployeesAgentIdRoute: typeof AiEmployeesAgentIdRoute
   ApiChatRoute: typeof ApiChatRoute
   GrowAdminRoute: typeof GrowAdminRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
   ApiFilesSplatRoute: typeof ApiFilesSplatRoute
   ApiPublicDodoWebhookRoute: typeof ApiPublicDodoWebhookRoute
@@ -538,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitesSiteIdRouteImport
       parentRoute: typeof SitesRoute
     }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/grow/admin': {
       id: '/grow/admin'
       path: '/grow/admin'
@@ -644,6 +664,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiEmployeesAgentIdRoute: AiEmployeesAgentIdRoute,
   ApiChatRoute: ApiChatRoute,
   GrowAdminRoute: GrowAdminRoute,
+  InviteTokenRoute: InviteTokenRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
   ApiFilesSplatRoute: ApiFilesSplatRoute,
   ApiPublicDodoWebhookRoute: ApiPublicDodoWebhookRoute,
