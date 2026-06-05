@@ -675,8 +675,9 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin
       }`.slice(0, 1000),
       inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
+        let preparedArgs: any = args ?? {};
         try {
-          const preparedArgs = await prepareComposioArgs(t, args ?? {}, userId, origin);
+          preparedArgs = await prepareComposioArgs(t, args ?? {}, userId, origin);
           const res = await executeTool(t.slug, userId, preparedArgs);
           if (isFacebookCreatePost && detectFacebookPermissionError(res)) {
             return await postToFacebookPageDirect(preparedArgs, userId);
@@ -750,10 +751,10 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin
             };
           }
           if (isFacebookCreatePost && detectFacebookPermissionError(msg)) {
-            return await postToFacebookPageDirect(args ?? {}, userId);
+            return await postToFacebookPageDirect(preparedArgs, userId);
           }
           if (isFacebookPhotoPost && detectFacebookPermissionError(msg)) {
-            return (await postPhotoToFacebookPageDirect(args ?? {}, userId)) ?? { error: msg };
+            return (await postPhotoToFacebookPageDirect(preparedArgs, userId)) ?? { error: msg };
           }
           return { error: msg };
         }
