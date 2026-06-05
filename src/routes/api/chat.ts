@@ -855,6 +855,74 @@ export const Route = createFileRoute("/api/chat")({
         }
         aiTools.list_recent_files = createListRecentFilesTool(userId);
 
+        // Team SMS tools (Aakash SMS). Always on.
+        aiTools.list_team_members = tool({
+          description:
+            "List the user's team members with their name, role, and phone number. Call this BEFORE send_team_sms whenever the user wants to message their team.",
+          inputSchema: jsonSchema({ type: "object", properties: {} }),
+          execute: async () => {
+            const { data, error } = await supabaseAdmin
+              .from("business_team_members")
+              .select("id, name, role, phone")
+              .eq("user_id", userId);
+            if (error) return { error: error.message };
+            return { members: data ?? [] };
+          },
+        });
+        aiTools.send_team_sms = tool({
+          description:
+            "Send an SMS via Aakash SMS to one or more team members. Pass to_all:true to send to every teammate with a phone, or member_ids (uuids) or names to target specific people. Use this whenever the user asks to text/SMS their team.",
+          inputSchema: jsonSchema({
+            type: "object",
+            required: ["message"],
+            properties: {
+              message: { type: "string" },
+              to_all: { type: "boolean" },
+              member_ids: { type: "array", items: { type: "string" } },
+              names: { type: "array", items: { type: "string" } },
+            },
+          }),
+          execute: async (args: any) => {
+            const parsed = z
+              .object({
+                message: z.string().min(1).max(1000),
+                to_all: z.boolean().optional(),
+                member_ids: z.array(z.string()).optional(),
+                names: z.array(z.string()).optional(),
+              })
+              .safeParse(args);
+            if (!parsed.success) return { error: "Invalid arguments" };
+            const { data: team, error } = await supabaseAdmin
+              .from("business_team_members")
+              .select("id, name, phone")
+              .eq("user_id", userId);
+            if (error) return { error: error.message };
+            let targets = (team ?? []).filter((m: any) => m.phone);
+            if (!parsed.data.to_all) {
+              const ids = new Set(parsed.data.member_ids ?? []);
+              const names = new Set((parsed.data.names ?? []).map((n) => n.toLowerCase()));
+              if (ids.size || names.size) {
+                targets = targets.filter(
+                  (m: any) => ids.has(m.id) || names.has((m.name ?? "").toLowerCase()),
+                );
+              }
+            }
+            if (!targets.length) return { error: "No team members with phone numbers matched." };
+            const { sendAakashSMS } = await import("@/lib/aakash.server");
+            const results: any[] = [];
+            for (const m of targets) {
+              const r = await sendAakashSMS({ to: m.phone, text: parsed.data.message });
+              results.push({ id: m.id, name: m.name, phone: m.phone, ok: r.ok, error: r.error });
+            }
+            return {
+              ok: results.every((r) => r.ok),
+              sent: results.filter((r) => r.ok).length,
+              total: results.length,
+              results,
+            };
+          },
+        });
+
         // Load business knowledge context for the system prompt.
         const { getKnowledgeContext, searchKnowledge, recordKnowledgeEntry } = await import(
           "@/lib/knowledge.server"
