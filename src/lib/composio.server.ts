@@ -42,18 +42,46 @@ export async function listToolkits(opts: { search?: string; limit?: number; curs
   return call<{ items: Toolkit[]; next_cursor?: string }>(`/toolkits?${params}`);
 }
 
+const REQUIRED_SCOPES: Record<string, string[]> = {
+  facebook: [
+    "public_profile",
+    "email",
+    "pages_show_list",
+    "pages_read_engagement",
+    "pages_manage_posts",
+    "pages_manage_engagement",
+    "pages_read_user_content",
+    "pages_manage_metadata",
+    "pages_messaging",
+    "read_insights",
+    "business_management",
+  ],
+};
+
+function hasRequiredScopes(config: any, required: string[]) {
+  if (!required.length) return true;
+  const scopes = new Set((config?.credentials?.scopes ?? config?.auth_config?.scopes ?? []).map(String));
+  return required.every((scope) => scopes.has(scope));
+}
+
 export async function getOrCreateManagedAuthConfig(toolkitSlug: string): Promise<string> {
+  const requiredScopes = REQUIRED_SCOPES[toolkitSlug.toLowerCase()] ?? [];
   // Try existing managed auth config
   const list = await call<{ items: any[] }>(
-    `/auth_configs?toolkit_slug=${encodeURIComponent(toolkitSlug)}&is_composio_managed=true&limit=1`,
+    `/auth_configs?toolkit_slug=${encodeURIComponent(toolkitSlug)}&is_composio_managed=true&limit=20`,
   );
-  if (list.items?.[0]?.id) return list.items[0].id;
+  const matching = (list.items ?? []).find((config) => hasRequiredScopes(config, requiredScopes));
+  if (matching?.id) return matching.id;
+  if (list.items?.[0]?.id && !requiredScopes.length) return list.items[0].id;
   // Create a managed one
   const created = await call<{ auth_config: { id: string } }>(`/auth_configs`, {
     method: "POST",
     body: JSON.stringify({
       toolkit: { slug: toolkitSlug },
-      auth_config: { type: "use_composio_managed_auth" },
+      auth_config: {
+        type: "use_composio_managed_auth",
+        ...(requiredScopes.length ? { scopes: requiredScopes } : {}),
+      },
     }),
   });
   return created.auth_config.id;
