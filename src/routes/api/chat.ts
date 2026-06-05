@@ -722,7 +722,12 @@ async function encodeInstagramJpeg(file: { bytes: Uint8Array; name: string; mime
     rgba = new Uint8Array(frame);
     width = decoded.width;
     height = decoded.height;
-  } else if (mime === "image/jpeg" || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || magic.isJpeg) {
+  } else if (
+    mime === "image/jpeg" ||
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    magic.isJpeg
+  ) {
     const jpegMod: any = await import("jpeg-js");
     const jpeg = jpegMod.default ?? jpegMod;
     const decoded = jpeg.decode(file.bytes, {
@@ -749,14 +754,17 @@ async function prepareInstagramImageUrl(value: any, userId: string, origin: stri
   const absolute = absolutizeUrl(value, origin);
   const file = await readFileReference(absolute);
   if (!file) return absolute;
-  const looksLikeImage = file.mimetype.startsWith("image/") || Object.values(hasImageMagic(file.bytes)).some(Boolean);
+  const looksLikeImage =
+    file.mimetype.startsWith("image/") || Object.values(hasImageMagic(file.bytes)).some(Boolean);
   if (!looksLikeImage) return absolute;
 
   const bytes = await encodeInstagramJpeg(file);
   if (bytes.byteLength > 8 * 1024 * 1024) {
     throw new Error("Instagram image is too large after conversion (max 8MB).");
   }
-  const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 70) || "image";
+  const base =
+    file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 70) ||
+    "image";
   const path = `${userId}/instagram/${Date.now()}-${base}.jpg`;
   const { error } = await supabaseAdmin.storage
     .from("artifacts")
@@ -783,7 +791,10 @@ async function prepareComposioArgs(t: ComposioTool, args: any, userId: string, o
     }
     for (const key of ["image_url", "video_url", "cover_url"]) {
       if (!next[key]) continue;
-      next[key] = key === "video_url" ? absolutizeUrl(next[key], origin) : await prepareInstagramImageUrl(next[key], userId, origin);
+      next[key] =
+        key === "video_url"
+          ? absolutizeUrl(next[key], origin)
+          : await prepareInstagramImageUrl(next[key], userId, origin);
     }
     return next;
   }
