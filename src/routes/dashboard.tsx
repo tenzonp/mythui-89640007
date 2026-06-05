@@ -45,6 +45,9 @@ function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan] = useState<any>(null);
   const [tasksCompleted, setTasksCompleted] = useState<number>(0);
+  const [recentTasks, setRecentTasks] = useState<
+    { id: string; title: string; agent: string; time: string; status: string }[]
+  >([]);
   const fetchPlan = useServerFn(getMyPlan);
 
   useEffect(() => {
