@@ -533,18 +533,109 @@ async function resolveConnectedInstagramAccount(userId: string) {
   };
 }
 
-async function resolveConnectedFacebookPage(userId: string): Promise<{ id: string; name?: string | null }> {
-  const res = await executeTool("FACEBOOK_GET_USER_PAGES", userId, {});
-  const data = (res as any)?.data ?? res;
-  const pages =
-    (data?.data && Array.isArray(data.data) && data.data) ||
+type FacebookPageInfo = {
+  id: string;
+  name?: string | null;
+  accessToken?: string | null;
+  tasks?: string[];
+};
+
+function extractFacebookPages(value: any): FacebookPageInfo[] {
+  const data = value?.data ?? value;
+  const responseData = data?.response_data ?? data?.responseData ?? data;
+  const rawPages =
+    (Array.isArray(responseData?.data) && responseData.data) ||
+    (Array.isArray(responseData?.pages) && responseData.pages) ||
+    (Array.isArray(data?.pages) && data.pages) ||
     (Array.isArray(data) && data) ||
-    (data?.pages && Array.isArray(data.pages) && data.pages) ||
     [];
-  const first = pages[0];
-  const id = first?.id || firstStringByKeys(data, ["page_id", "id"]);
+  return rawPages
+    .map((page: any) => ({
+      id: String(page?.id || page?.page_id || "").trim(),
+      name: page?.name ?? null,
+      accessToken: page?.access_token || page?.accessToken || null,
+      tasks: Array.isArray(page?.tasks) ? page.tasks.map((task: any) => String(task)) : undefined,
+    }))
+    .filter((page) => /^\d+$/.test(page.id));
+}
+
+function assertFacebookPageCanPublish(page: FacebookPageInfo) {
+  const tasks = page.tasks ?? [];
+  if (tasks.length && !tasks.includes("CREATE_CONTENT") && !tasks.includes("MANAGE")) {
+    throw new Error(
+      `Facebook page ${page.name ?? page.id} is connected, but it does not grant content publishing access. Reconnect Facebook from Integrations and approve page posting access.`,
+    );
+  }
+}
+
+async function resolveConnectedFacebookPage(
+  userId: string,
+  preferredPageId?: string,
+): Promise<FacebookPageInfo> {
+  const res = await executeTool("FACEBOOK_GET_USER_PAGES", userId, {});
+  const pages = extractFacebookPages(res);
+  const requested = preferredPageId ? String(preferredPageId).trim() : "";
+  const page = (requested && pages.find((p) => p.id === requested)) || pages[0];
+  if (page?.id) {
+    assertFacebookPageCanPublish(page);
+    return page;
+  }
+  const data = (res as any)?.data ?? res;
+  const id = firstStringByKeys(data, ["page_id", "id"]);
   if (!id) throw new Error("No Facebook Page found on the connected account.");
-  return { id: String(id), name: first?.name ?? null };
+  return { id: String(id), name: null };
+}
+
+function detectFacebookPermissionError(result: any): boolean {
+  try {
+    const s = typeof result === "string" ? result : JSON.stringify(result ?? "");
+    return /pages_manage_posts|pages_read_engagement|permission|not allowed for this call|OAuthException|Forbidden/i.test(
+      s,
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function postToFacebookPageDirect(args: any, userId: string) {
+  const page = await resolveConnectedFacebookPage(userId, args?.page_id);
+  if (!page.accessToken) {
+    throw new Error("Facebook page access is connected, but no Page access token was returned. Reconnect Facebook from Integrations and approve page posting access.");
+  }
+  const params = new URLSearchParams({ access_token: page.accessToken });
+  if (args?.message) params.set("message", String(args.message));
+  if (args?.link) params.set("link", String(args.link));
+  if (typeof args?.published === "boolean") params.set("published", String(args.published));
+  if (args?.scheduled_publish_time) params.set("scheduled_publish_time", String(args.scheduled_publish_time));
+  const res = await fetch(`https://graph.facebook.com/v20.0/${page.id}/feed`, {
+    method: "POST",
+    body: params,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = json?.error?.message || `Facebook post failed (${res.status})`;
+    throw new Error(`${message}. Reconnect Facebook from Integrations and approve pages_read_engagement + pages_manage_posts if this continues.`);
+  }
+  return { successful: true, data: json, page_id: page.id, page_name: page.name, via: "facebook_page_access" };
+}
+
+async function postPhotoToFacebookPageDirect(args: any, userId: string) {
+  if (!args?.url) return null;
+  const page = await resolveConnectedFacebookPage(userId, args?.page_id);
+  if (!page.accessToken) return null;
+  const params = new URLSearchParams({ access_token: page.accessToken, url: String(args.url) });
+  if (args?.message) params.set("caption", String(args.message));
+  if (typeof args?.published === "boolean") params.set("published", String(args.published));
+  const res = await fetch(`https://graph.facebook.com/v20.0/${page.id}/photos`, {
+    method: "POST",
+    body: params,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = json?.error?.message || `Facebook photo post failed (${res.status})`;
+    throw new Error(`${message}. Reconnect Facebook from Integrations and approve pages_read_engagement + pages_manage_posts if this continues.`);
+  }
+  return { successful: true, data: json, page_id: page.id, page_name: page.name, via: "facebook_page_access" };
 }
 
 
