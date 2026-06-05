@@ -786,14 +786,14 @@ ${missingNote}
 Be concise, warm, proactive. Speak in first person as ${agent.name}.`;
 }
 
-async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[]) {
+async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[], origin: string) {
   const allowedSlugs = agent.toolkits.length
     ? activeSlugs.filter((s) => agent.toolkits.some((t) => t.toLowerCase() === s.toLowerCase()))
     : activeSlugs;
   if (!allowedSlugs.length) return { tools: {}, allowedSlugs };
   try {
     const toolsRes = await listToolsForToolkits(userId, allowedSlugs, 25);
-    const tools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId);
+    const tools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId, origin);
     if (hasInstagram(allowedSlugs)) {
       tools["send_pending_instagram_replies"] = createPendingInstagramReplyTool(userId);
     }
