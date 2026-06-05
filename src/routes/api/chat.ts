@@ -649,6 +649,9 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin
         : { type: "object", properties: {} };
     const schema = normalizeToolInputSchema(raw, t.toolkit?.slug);
     const isInstagram = (t.toolkit?.slug ?? "").toLowerCase() === "instagram";
+    const isFacebook = (t.toolkit?.slug ?? "").toLowerCase() === "facebook";
+    const isFacebookCreatePost = isFacebook && t.slug === "FACEBOOK_CREATE_POST";
+    const isFacebookPhotoPost = isFacebook && t.slug === "FACEBOOK_CREATE_PHOTO_POST";
     const isInstagramSend = isInstagramSendTool(t);
     out[safeName] = tool({
       description: `[${t.toolkit?.slug ?? ""}] ${t.description ?? t.name}${
@@ -661,6 +664,12 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin
         try {
           const preparedArgs = await prepareComposioArgs(t, args ?? {}, userId, origin);
           const res = await executeTool(t.slug, userId, preparedArgs);
+          if (isFacebookCreatePost && detectFacebookPermissionError(res)) {
+            return await postToFacebookPageDirect(preparedArgs, userId);
+          }
+          if (isFacebookPhotoPost && detectFacebookPermissionError(res)) {
+            return (await postPhotoToFacebookPageDirect(preparedArgs, userId)) ?? res;
+          }
           if (isInstagram && detectInstagramWindowClosed(res)) {
             const blocked = buildInstagramWindowResponse(userId, args, res);
             if (isInstagramSend && blocked.recipientId && blocked.messageText) {
@@ -725,6 +734,12 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin
               message:
                 "Instagram's 24-hour messaging window is closed. Do NOT retry — wait for the recipient to message us first.",
             };
+          }
+          if (isFacebookCreatePost && detectFacebookPermissionError(msg)) {
+            return await postToFacebookPageDirect(args ?? {}, userId);
+          }
+          if (isFacebookPhotoPost && detectFacebookPermissionError(msg)) {
+            return (await postPhotoToFacebookPageDirect(args ?? {}, userId)) ?? { error: msg };
           }
           return { error: msg };
         }
