@@ -467,6 +467,18 @@ function createPendingInstagramReplyTool(userId: string) {
 
 function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
   const schema = raw?.type ? { ...raw } : { type: "object", properties: raw ?? {} };
+  if (toolkitSlug?.toLowerCase() === "instagram" && schema.properties?.ig_user_id) {
+    schema.properties = { ...schema.properties };
+    schema.properties.ig_user_id = {
+      ...schema.properties.ig_user_id,
+      description:
+        "Optional. Leave blank to use the Instagram Business Account already connected in Integrations. Do not ask the user for this ID when Instagram is connected.",
+    };
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.filter((key: string) => key !== "ig_user_id");
+      if (!schema.required.length) delete schema.required;
+    }
+  }
   if (toolkitSlug?.toLowerCase() === "gmail" && schema.properties?.attachment) {
     schema.properties = { ...schema.properties };
     schema.properties.attachment = {
@@ -485,7 +497,30 @@ function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
   return schema;
 }
 
-function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
+function firstStringByKeys(value: any, keys: string[]): string | null {
+  return extractByKeys(value, keys.map((k) => k.toLowerCase()));
+}
+
+function absolutizeUrl(value: any, origin: string) {
+  if (typeof value !== "string" || !value.trim()) return value;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/")) return `${origin}${value}`;
+  return value;
+}
+
+async function resolveConnectedInstagramAccount(userId: string) {
+  const res = await executeTool("INSTAGRAM_GET_USER_INFO", userId, {});
+  const data = (res as any)?.data ?? res;
+  const id = firstStringByKeys(data, ["id", "ig_user_id", "instagram_business_account_id"]);
+  if (!id) throw new Error("Connected Instagram account did not return an account ID.");
+  return {
+    id,
+    username: firstStringByKeys(data, ["username"]),
+    accountType: firstStringByKeys(data, ["account_type"]),
+  };
+}
+
+function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
     const safeName = t.slug.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
@@ -505,7 +540,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
       inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
         try {
-          const preparedArgs = await prepareComposioArgs(t, args ?? {});
+          const preparedArgs = await prepareComposioArgs(t, args ?? {}, userId, origin);
           const res = await executeTool(t.slug, userId, preparedArgs);
           if (isInstagram && detectInstagramWindowClosed(res)) {
             const blocked = buildInstagramWindowResponse(userId, args, res);
