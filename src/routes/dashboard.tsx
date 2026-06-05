@@ -141,13 +141,6 @@ function Dashboard() {
     { label: "Hours saved", value: `${hoursSaved}h`, icon: Clock, trend: `${HUMAN_MIN - AI_MIN}m per task` },
   ];
 
-  const recentTasks = [
-    { title: "Q3 marketing plan drafted by Nova", agent: "Nova", time: "2m ago", status: "done" },
-    { title: "Customer churn analysis by Orion", agent: "Orion", time: "15m ago", status: "done" },
-    { title: "Blog post SEO optimized by Iris", agent: "Iris", time: "32m ago", status: "done" },
-    { title: "Sales pipeline review by Atlas", agent: "Atlas", time: "1h ago", status: "in-progress" },
-    { title: "User feedback summary by Echo", agent: "Echo", time: "2h ago", status: "done" },
-  ];
 
   return (
     <div className="min-h-screen bg-background flex">
