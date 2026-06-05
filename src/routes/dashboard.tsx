@@ -70,6 +70,36 @@ function Dashboard() {
         .eq("user_id", user.id)
         .eq("role", "assistant")
         .then(({ count }) => setTasksCompleted(count ?? 0));
+      supabase
+        .from("messages")
+        .select("id, parts, created_at, thread_id, threads(title)")
+        .eq("user_id", user.id)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(6)
+        .then(({ data }) => {
+          if (!data) return;
+          const items = data.map((m: any) => {
+            const parts = Array.isArray(m.parts) ? m.parts : [];
+            const toolPart = parts.find((p: any) => typeof p?.type === "string" && p.type.startsWith("tool-"));
+            const textPart = [...parts].reverse().find((p: any) => p?.type === "text" && p.text);
+            const toolName = toolPart?.type?.replace("tool-", "").replace(/_/g, " ");
+            const title = textPart?.text
+              ? String(textPart.text).slice(0, 90)
+              : toolName
+                ? `Ran ${toolName}`
+                : m.threads?.title || "AI task";
+            const running = toolPart && toolPart.state !== "output-available" && toolPart.state !== "done";
+            return {
+              id: m.id,
+              title,
+              agent: toolName ? `Tool · ${toolName}` : "Assistant",
+              time: timeAgo(new Date(m.created_at)),
+              status: running ? "in-progress" : "done",
+            };
+          });
+          setRecentTasks(items);
+        });
     };
     load();
     const t = setInterval(load, 5000);
