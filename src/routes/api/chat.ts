@@ -556,7 +556,7 @@ function extractFacebookPages(value: any): FacebookPageInfo[] {
       accessToken: page?.access_token || page?.accessToken || null,
       tasks: Array.isArray(page?.tasks) ? page.tasks.map((task: any) => String(task)) : undefined,
     }))
-    .filter((page) => /^\d+$/.test(page.id));
+    .filter((page: FacebookPageInfo) => /^\d+$/.test(page.id));
 }
 
 function assertFacebookPageCanPublish(page: FacebookPageInfo) {
