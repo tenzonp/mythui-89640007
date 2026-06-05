@@ -44,6 +44,7 @@ function Dashboard() {
   const { user, loading, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan] = useState<any>(null);
+  const [tasksCompleted, setTasksCompleted] = useState<number>(0);
   const fetchPlan = useServerFn(getMyPlan);
 
   useEffect(() => {
@@ -58,7 +59,15 @@ function Dashboard() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => setProfile(data));
-    const load = () => fetchPlan().then(setPlan).catch(() => {});
+    const load = () => {
+      fetchPlan().then(setPlan).catch(() => {});
+      supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("role", "assistant")
+        .then(({ count }) => setTasksCompleted(count ?? 0));
+    };
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
@@ -81,6 +90,12 @@ function Dashboard() {
       : plan.monthlyCredits
     : 0;
 
+  // Saved hours = tasks * (avg human minutes per task - avg AI minutes per task) / 60
+  // Assume 30 min human vs ~1 min AI = 29 min saved per task.
+  const HUMAN_MIN = 30;
+  const AI_MIN = 1;
+  const hoursSaved = ((tasksCompleted * (HUMAN_MIN - AI_MIN)) / 60).toFixed(1);
+
   const stats = [
     {
       label: plan?.tier === "free" ? "Credits today" : "Credits this month",
@@ -88,9 +103,9 @@ function Dashboard() {
       icon: Sparkles,
       trend: plan ? `of ${creditsMax.toLocaleString()}` : "loading",
     },
-    { label: "Tasks completed", value: "248", icon: CheckCircle2, trend: "+12%" },
-    { label: "Active agents", value: "5", icon: Users, trend: "All online" },
-    { label: "Hours saved", value: "94h", icon: Clock, trend: "this week" },
+    { label: "Tasks completed", value: tasksCompleted.toLocaleString(), icon: CheckCircle2, trend: "all time" },
+    { label: "Active agents", value: String(agents.length), icon: Users, trend: "All online" },
+    { label: "Hours saved", value: `${hoursSaved}h`, icon: Clock, trend: `${HUMAN_MIN - AI_MIN}m per task` },
   ];
 
   const recentTasks = [

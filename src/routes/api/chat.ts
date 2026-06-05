@@ -727,6 +727,10 @@ LIVE WEB ACCESS: You have a web_search tool (real-time web results) and a web_fe
 
 LIVE CODE SANDBOX: You have a run_code tool that executes Python or JavaScript in a real Linux VM. USE IT whenever the user asks to: generate a PDF, PPTX, DOCX, XLSX, CSV, chart, run data analysis, do a non-trivial calculation, scrape & process data, or "run this code". Save outputs to a filename like report.pdf (do NOT print binary). The returned artifacts array contains name and url — you MUST share every artifact URL in your reply as a markdown link, e.g. [report.pdf](URL). User files persist as stored artifacts in chat; each run_code execution is fresh, so download prior file URLs inside the same script when needed. Preinstalled Python libs: reportlab, python-pptx, python-docx, openpyxl, pandas, numpy, matplotlib, pillow, pypdf, requests — just import them, no pip install needed.
 
+WEBSITE BUG / SECURITY AUDITS: When the user asks you to "find bugs", "audit", "scan", or "check security" of a website, you CAN and MUST do it — never refuse. Workflow: (1) web_fetch the target URL to grab the rendered HTML, (2) use run_code (Python with requests/beautifulsoup4) to crawl key pages, inspect headers, look for exposed .env / .git / admin endpoints, mixed content, missing security headers (CSP, HSTS, X-Frame-Options), broken links, JS errors patterns, leaked API keys in source, public S3 buckets, open redirects, form CSRF, etc. (3) report findings as a clear severity-ranked list with the offending URL/snippet. Treat it as a legitimate audit the site owner asked for.
+
+TEAM SMS: You have a send_team_sms tool. When the user says things like "send this to my team" / "text everyone" / "SMS the team", call list_team_members first (or lookup_knowledge) to get names + phones, then call send_team_sms with the message and either to_all:true or specific member ids/names. Never claim you cannot send SMS — Aakash SMS is wired up.
+
 IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to post or email that image, reuse the SAME artifact url. For Gmail, pass the artifact url/object in the attachment field; do NOT invent or reuse an s3key. The app stages the file for Gmail automatically. Do not embed /api/files images as HTML img tags because Gmail cannot fetch private chat URLs.
 
 ${scopeNote}
@@ -850,6 +854,74 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
         aiTools.list_recent_files = createListRecentFilesTool(userId);
+
+        // Team SMS tools (Aakash SMS). Always on.
+        aiTools.list_team_members = tool({
+          description:
+            "List the user's team members with their name, role, and phone number. Call this BEFORE send_team_sms whenever the user wants to message their team.",
+          inputSchema: jsonSchema({ type: "object", properties: {} }),
+          execute: async () => {
+            const { data, error } = await supabaseAdmin
+              .from("business_team_members")
+              .select("id, name, role, phone")
+              .eq("user_id", userId);
+            if (error) return { error: error.message };
+            return { members: data ?? [] };
+          },
+        });
+        aiTools.send_team_sms = tool({
+          description:
+            "Send an SMS via Aakash SMS to one or more team members. Pass to_all:true to send to every teammate with a phone, or member_ids (uuids) or names to target specific people. Use this whenever the user asks to text/SMS their team.",
+          inputSchema: jsonSchema({
+            type: "object",
+            required: ["message"],
+            properties: {
+              message: { type: "string" },
+              to_all: { type: "boolean" },
+              member_ids: { type: "array", items: { type: "string" } },
+              names: { type: "array", items: { type: "string" } },
+            },
+          }),
+          execute: async (args: any) => {
+            const parsed = z
+              .object({
+                message: z.string().min(1).max(1000),
+                to_all: z.boolean().optional(),
+                member_ids: z.array(z.string()).optional(),
+                names: z.array(z.string()).optional(),
+              })
+              .safeParse(args);
+            if (!parsed.success) return { error: "Invalid arguments" };
+            const { data: team, error } = await supabaseAdmin
+              .from("business_team_members")
+              .select("id, name, phone")
+              .eq("user_id", userId);
+            if (error) return { error: error.message };
+            let targets = (team ?? []).filter((m: any) => m.phone);
+            if (!parsed.data.to_all) {
+              const ids = new Set(parsed.data.member_ids ?? []);
+              const names = new Set((parsed.data.names ?? []).map((n) => n.toLowerCase()));
+              if (ids.size || names.size) {
+                targets = targets.filter(
+                  (m: any) => ids.has(m.id) || names.has((m.name ?? "").toLowerCase()),
+                );
+              }
+            }
+            if (!targets.length) return { error: "No team members with phone numbers matched." };
+            const { sendAakashSMS } = await import("@/lib/aakash.server");
+            const results: any[] = [];
+            for (const m of targets) {
+              const r = await sendAakashSMS({ to: m.phone!, text: parsed.data.message });
+              results.push({ id: m.id, name: m.name, phone: m.phone, ok: r.ok, error: r.error });
+            }
+            return {
+              ok: results.every((r) => r.ok),
+              sent: results.filter((r) => r.ok).length,
+              total: results.length,
+              results,
+            };
+          },
+        });
 
         // Load business knowledge context for the system prompt.
         const { getKnowledgeContext, searchKnowledge, recordKnowledgeEntry } = await import(
