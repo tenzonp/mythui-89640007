@@ -1,19 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, ArrowRight } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
+import { ArrowUpRight, ArrowRight, Play, ChevronLeft, ChevronRight, Home, LayoutGrid, MessageSquare, TrendingUp, Settings } from "lucide-react";
+import { JellyBlob } from "@/components/JellyBlob";
+import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { agents } from "@/data/agents";
-import heroImg from "@/assets/landing-hero.jpg";
-import panel2Img from "@/assets/landing-panel-2.jpg";
-import panel3Img from "@/assets/landing-panel-3.jpg";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Mythmind — A horizontal AI workforce" },
-      { name: "description", content: "Scroll sideways. Meet the AI employees that think, build, and ship for you." },
-      { property: "og:title", content: "Mythmind — A horizontal AI workforce" },
-      { property: "og:description", content: "Scroll sideways. Meet the AI employees that think, build, and ship for you." },
+      { title: "Mythmind — AI Workforce OS" },
+      { name: "description", content: "Mythmind brings together a team of AI employees that think, plan, and execute — so you can focus on what really matters." },
+      { property: "og:title", content: "Mythmind — AI Workforce OS" },
+      { property: "og:description", content: "A team of AI employees that specialize, collaborate, and deliver real work." },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -24,14 +23,12 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-// soft accent palette — bold black & white + young soft pops
-const SOFT = {
-  peach: "#FFD7C2",
-  butter: "#FFE9A8",
-  mint: "#CFEFE2",
-  pink: "#FBD5E2",
-  sky: "#D6E6FF",
-};
+const tasks = [
+  { title: "Summer campaign strategy", agent: "Nova — Marketing", status: "In progress", color: "oklch(0.7 0.2 285)" },
+  { title: "Competitor research", agent: "Orion — Research", status: "In progress", color: "oklch(0.6 0.18 250)" },
+  { title: "Landing page concept", agent: "Iris — Design", status: "Review", color: "oklch(0.7 0.2 350)" },
+  { title: "Lead scoring automation", agent: "Atlas — Sales", status: "Completed", color: "oklch(0.65 0.18 150)" },
+];
 
 function Index() {
   const { user, loading } = useAuth();
@@ -39,277 +36,199 @@ function Index() {
   useEffect(() => {
     if (!loading && user) navigate({ to: "/dashboard", replace: true });
   }, [user, loading]);
-
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [progress, setProgress] = useState(0); // 0..1
-  const [panelCount] = useState(6);
-
-  // Horizontal pan: container height = panelCount * 100vh, sticky track translates X
-  useEffect(() => {
-    const onScroll = () => {
-      const el = wrapRef.current;
-      const tr = trackRef.current;
-      if (!el || !tr) return;
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const total = el.offsetHeight - vh;
-      const scrolled = Math.min(Math.max(-rect.top, 0), total);
-      const p = total > 0 ? scrolled / total : 0;
-      setProgress(p);
-      const trackWidth = tr.scrollWidth;
-      const maxX = trackWidth - window.innerWidth;
-      tr.style.transform = `translate3d(${-p * maxX}px, 0, 0)`;
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, []);
-
   if (loading || user) return null;
-
   return (
-    <div className="bg-white text-black overflow-x-hidden">
-      {/* Fixed minimal chrome */}
-      <header className="fixed top-0 inset-x-0 z-50 mix-blend-difference">
-        <div className="flex items-center justify-between px-6 md:px-10 py-6 text-white">
-          <Link to="/" className="font-serif text-2xl tracking-tight">
-            mythmind<span style={{ color: SOFT.peach }}>.</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-8 text-[10px] tracking-[0.28em] font-semibold">
-            <span>SCROLL →</span>
-            <span className="opacity-60">{String(Math.round(progress * 100)).padStart(2, "0")} / 100</span>
+    <div className="min-h-screen bg-background text-foreground">
+      <SiteHeader />
+
+      {/* Hero */}
+      <section className="max-w-[1240px] mx-auto px-8 pt-20 pb-24 grid md:grid-cols-2 gap-12 items-center">
+        <div>
+          <div className="text-violet text-[11px] tracking-[0.22em] font-semibold mb-8">AI WORKFORCE OS</div>
+          <h1 className="font-serif text-[68px] leading-[1.05] tracking-tight">
+            Your business.<br />
+            Amplified by<br />
+            <span className="text-violet italic">AI employees.</span>
+          </h1>
+          <p className="mt-8 text-muted-foreground max-w-md leading-relaxed">
+            Mythmind brings together a team of AI employees that think, plan, and execute — so you can focus on what really matters.
+          </p>
+          <div className="mt-12 flex items-center gap-10 flex-wrap">
+            <Link to="/ai-employees" className="flex items-center gap-4 group">
+              <span className="w-12 h-12 rounded-full flex items-center justify-center text-white transition-transform group-hover:scale-105" style={{ background: "var(--ink)" }}>
+                <ArrowUpRight className="w-5 h-5" />
+              </span>
+              <span>
+                <div className="text-[11px] tracking-[0.18em] font-semibold">LAUNCH WORKSPACE</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Start building with your AI team</div>
+              </span>
+            </Link>
+            <a href="#" className="flex items-center gap-3 group">
+              <span>
+                <div className="text-[11px] tracking-[0.18em] font-semibold">WATCH FILM</div>
+                <div className="text-xs text-muted-foreground mt-0.5">See how it works</div>
+              </span>
+              <span className="w-10 h-10 rounded-full border border-border flex items-center justify-center">
+                <Play className="w-3.5 h-3.5 fill-foreground" />
+              </span>
+            </a>
           </div>
-          <Link to="/auth" className="text-[10px] tracking-[0.28em] font-semibold border border-white/60 rounded-full px-4 py-2 hover:bg-white hover:text-black transition-colors">
-            ENTER
-          </Link>
         </div>
-      </header>
+        <div className="relative">
+          <JellyBlob />
+        </div>
+      </section>
 
-      {/* Progress bar */}
-      <div className="fixed top-0 left-0 right-0 h-[2px] z-50 bg-transparent">
-        <div className="h-full bg-black transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
-      </div>
+      {/* Agents */}
+      <section id="agents" className="bg-surface py-24">
+        <div className="max-w-[1240px] mx-auto px-8">
+          <div className="flex items-start justify-between mb-16 flex-wrap gap-6">
+            <div>
+              <div className="text-violet text-[11px] tracking-[0.22em] font-semibold mb-6">BUILT DIFFERENT</div>
+              <h2 className="font-serif text-5xl leading-[1.1] max-w-md">
+                AI employees that specialize, collaborate, and deliver.
+              </h2>
+            </div>
+            <div className="flex gap-2 bg-background rounded-full p-1.5 shadow-sm">
+              <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted"><ChevronLeft className="w-4 h-4" /></button>
+              <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+          </div>
 
-      {/* Horizontal scroll stage */}
-      <div ref={wrapRef} style={{ height: `${panelCount * 100}vh` }} className="relative">
-        <div className="sticky top-0 h-screen overflow-hidden">
-          <div ref={trackRef} className="h-screen flex will-change-transform">
-
-            {/* PANEL 1 — Hero */}
-            <Panel bg="#FAFAFA">
-              <div className="grid grid-cols-12 gap-8 w-full h-full items-center px-12">
-                <div className="col-span-7 relative">
-                  <div className="text-[10px] tracking-[0.32em] font-semibold mb-8" style={{ color: "#666" }}>
-                    ISSUE №01 — A NEW KIND OF WORKFORCE
-                  </div>
-                  <h1 className="font-serif leading-[0.92] tracking-tight text-[clamp(64px,11vw,180px)]">
-                    work, <span className="italic">sideways.</span>
-                  </h1>
-                  <p className="mt-10 max-w-md text-[15px] leading-relaxed text-neutral-600">
-                    Mythmind is a horizontal magazine of AI employees — Nova, Orion, Iris, Atlas, Reyes — who think, plan and ship the boring parts of your business so you don't have to.
-                  </p>
-                  <div className="mt-12 flex items-center gap-6">
-                    <Link to="/ai-employees" className="group inline-flex items-center gap-3 bg-black text-white pl-6 pr-2 py-2 rounded-full">
-                      <span className="text-[11px] tracking-[0.22em] font-semibold">MEET THE STAFF</span>
-                      <span className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center group-hover:rotate-45 transition-transform">
-                        <ArrowUpRight className="w-4 h-4" />
-                      </span>
-                    </Link>
-                    <div className="text-[10px] tracking-[0.28em] text-neutral-500">↳ DRAG / SCROLL TO READ</div>
-                  </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {agents.map((a) => (
+              <Link
+                key={a.id}
+                to="/ai-employees/$agentId"
+                params={{ agentId: a.id }}
+                className="bg-background rounded-2xl p-6 border border-border/40 hover:shadow-xl transition-all hover:-translate-y-1 group"
+              >
+                <div className="relative mx-auto mb-5 w-24 h-24 rounded-full overflow-hidden ring-4 ring-white shadow-md animate-float"
+                     style={{ background: a.accentSoft }}>
+                  <img src={a.image} alt={a.name} loading="lazy" width={512} height={512} className="w-full h-full object-cover" />
                 </div>
-                <div className="col-span-5 relative h-[80vh]">
-                  <div className="absolute inset-0 rounded-[2px] overflow-hidden">
-                    <img src={heroImg} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="absolute -bottom-4 -left-6 px-4 py-2 bg-black text-white text-[10px] tracking-[0.28em]">
-                    fig. 01 — origin
-                  </div>
-                  <div className="absolute top-4 right-4 w-20 h-20 rounded-full flex items-center justify-center text-[10px] tracking-[0.2em] font-semibold animate-spin-slow"
-                    style={{ background: SOFT.butter }}>
-                    LIVE · 24/7 ·
-                  </div>
+                <div className="text-center text-[10px] tracking-[0.18em] font-semibold mb-1" style={{ color: a.accent }}>{a.name.split(" ")[0].toUpperCase()}</div>
+                <h3 className="font-semibold text-base text-center mb-3">{a.role}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed text-center mb-6">{a.tagline}</p>
+                <div className="flex justify-center">
+                  <ArrowRight className="w-4 h-4 text-foreground/70 group-hover:translate-x-1 transition-transform" />
                 </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Dashboard preview */}
+          <div className="mt-8 grid md:grid-cols-[80px_1fr_1.3fr] gap-4">
+            <div className="bg-background rounded-2xl border border-border/40 p-4 flex flex-col items-center gap-6 py-6">
+              <div className="font-serif text-2xl">m<span className="text-violet">.</span></div>
+              <div className="flex flex-col gap-4 mt-4">
+                {[Home, LayoutGrid, MessageSquare, TrendingUp].map((Icon, i) => (
+                  <button key={i} className={`w-10 h-10 rounded-xl flex items-center justify-center ${i===0 ? "bg-surface shadow-sm" : "text-muted-foreground hover:bg-surface"}`}>
+                    <Icon className="w-4 h-4" />
+                  </button>
+                ))}
               </div>
-            </Panel>
+              <button className="mt-auto w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground"><Settings className="w-4 h-4" /></button>
+            </div>
 
-            {/* PANEL 2 — Manifesto */}
-            <Panel bg="#000" text="#fff">
-              <div className="w-full h-full flex flex-col justify-center px-12 relative">
-                <div className="text-[10px] tracking-[0.32em] font-semibold mb-8 opacity-60">
-                  CHAPTER ONE — MANIFESTO
-                </div>
-                <h2 className="font-serif text-[clamp(48px,8vw,140px)] leading-[0.95] max-w-[18ch]">
-                  not a tool. not a chatbot. <span className="italic" style={{ color: SOFT.mint }}>a staff.</span>
-                </h2>
-                <div className="mt-12 grid grid-cols-3 gap-12 max-w-4xl">
-                  {[
-                    ["01", "They specialize.", "Each AI employee owns one craft — and gets sharper every week."],
-                    ["02", "They collaborate.", "Briefs hand off between them like a real team. No copy-paste."],
-                    ["03", "They ship.", "Sites, posts, replies, decks — delivered, not just drafted."],
-                  ].map(([n, t, d]) => (
-                    <div key={n}>
-                      <div className="text-[10px] tracking-[0.32em] opacity-50">{n}</div>
-                      <div className="font-serif text-2xl mt-2">{t}</div>
-                      <div className="text-sm mt-2 text-white/60 leading-relaxed">{d}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="absolute bottom-12 right-12 text-[10px] tracking-[0.28em] opacity-50">PG. 02</div>
-              </div>
-            </Panel>
-
-            {/* PANEL 3 — Staff gallery */}
-            <Panel bg={SOFT.peach}>
-              <div className="w-full h-full flex flex-col justify-center px-12">
-                <div className="flex items-end justify-between mb-12">
-                  <div>
-                    <div className="text-[10px] tracking-[0.32em] font-semibold mb-4">THE STAFF — FIVE PORTRAITS</div>
-                    <h2 className="font-serif text-[clamp(48px,7vw,110px)] leading-[0.95]">
-                      meet the <span className="italic">five.</span>
-                    </h2>
-                  </div>
-                  <div className="text-[10px] tracking-[0.28em] text-black/60 max-w-xs text-right">
-                    Each portrait below is a real working employee. Click one to give them a brief.
-                  </div>
-                </div>
-                <div className="grid grid-cols-5 gap-6">
-                  {agents.map((a, i) => (
-                    <Link
-                      key={a.id}
-                      to="/ai-employees/$agentId"
-                      params={{ agentId: a.id }}
-                      className="group"
-                    >
-                      <div className="aspect-[3/4] bg-white overflow-hidden mb-3 relative">
-                        <img src={a.image} alt={a.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                        <div className="absolute top-2 left-2 text-[9px] tracking-[0.28em] font-semibold bg-black text-white px-2 py-1">
-                          0{i + 1}
-                        </div>
+            <div className="bg-background rounded-2xl border border-border/40 p-6">
+              <div className="mb-1 font-semibold">Good morning, Arjun ☀️</div>
+              <div className="text-xs text-muted-foreground mb-5">Here's what your team is working on.</div>
+              <div className="space-y-2">
+                {tasks.map((t) => (
+                  <div key={t.title} className="flex items-center justify-between p-3 rounded-xl hover:bg-surface transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `color-mix(in oklab, ${t.color} 18%, white)` }}>
+                        <div className="w-4 h-4 rounded" style={{ background: t.color }} />
                       </div>
-                      <div className="font-serif text-xl">{a.name.split(" ")[0]}</div>
-                      <div className="text-[11px] tracking-[0.2em] text-black/60 uppercase">{a.role}</div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </Panel>
-
-            {/* PANEL 4 — Big editorial image */}
-            <Panel bg="#fff">
-              <div className="w-full h-full grid grid-cols-12 px-12 items-center gap-8">
-                <div className="col-span-5 relative h-[80vh]">
-                  <img src={panel2Img} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute -right-6 top-12 -rotate-90 origin-top-right text-[10px] tracking-[0.32em]">
-                    HOW IT WORKS — A FILM IN THREE ACTS
-                  </div>
-                </div>
-                <div className="col-span-7">
-                  <div className="text-[10px] tracking-[0.32em] font-semibold mb-6 text-neutral-500">SPREAD 04</div>
-                  <h2 className="font-serif text-[clamp(56px,8vw,130px)] leading-[0.95]">
-                    you brief. <br />they <span className="italic" style={{ background: SOFT.mint, padding: "0 .2em" }}>build.</span>
-                  </h2>
-                  <div className="mt-10 space-y-6 max-w-lg text-[15px] leading-relaxed">
-                    <Row n="1." title="Say it like a human.">No prompts to engineer. "Make me a landing page for my tea shop."</Row>
-                    <Row n="2." title="Watch them think.">They open a thread, plan the work, ask for what they need.</Row>
-                    <Row n="3." title="Ship live.">A real URL, a real post, a real reply — pushed live in minutes.</Row>
-                  </div>
-                </div>
-              </div>
-            </Panel>
-
-            {/* PANEL 5 — Ticker / press */}
-            <Panel bg={SOFT.mint}>
-              <div className="w-full h-full flex flex-col justify-center px-12 relative">
-                <div className="text-[10px] tracking-[0.32em] font-semibold mb-8">VOL. 01 — SHIPPED THIS WEEK</div>
-                <div className="space-y-2">
-                  {[
-                    ["chiya-bajjar-premium.netlify.app", "Reyes — Product", "12s build"],
-                    ["nova replied to 48 IG DMs", "Nova — Marketing", "auto"],
-                    ["lead-scoring v2", "Atlas — Sales", "shipped"],
-                    ["weekly brief: Q2 plan", "Orion — Research", "draft → final"],
-                    ["new identity for nova-studio", "Iris — Design", "live"],
-                  ].map(([t, who, status]) => (
-                    <div key={t} className="grid grid-cols-12 items-center border-b border-black/15 py-4">
-                      <div className="col-span-7 font-serif text-[clamp(20px,2.4vw,36px)] truncate">{t}</div>
-                      <div className="col-span-3 text-[11px] tracking-[0.22em]">{who}</div>
-                      <div className="col-span-2 text-right text-[11px] tracking-[0.22em] font-semibold">{status}</div>
+                      <div>
+                        <div className="text-sm font-medium">{t.title}</div>
+                        <div className="text-[11px] text-muted-foreground">{t.agent}</div>
+                      </div>
                     </div>
-                  ))}
-                </div>
-                <div className="absolute bottom-12 right-12 text-[10px] tracking-[0.28em] opacity-60">PG. 05</div>
-              </div>
-            </Panel>
-
-            {/* PANEL 6 — Closing CTA */}
-            <Panel bg="#000" text="#fff">
-              <div className="w-full h-full grid grid-cols-12 items-center px-12 gap-8 relative">
-                <div className="col-span-7">
-                  <div className="text-[10px] tracking-[0.32em] font-semibold mb-8 opacity-60">END — TURN THE PAGE</div>
-                  <h2 className="font-serif text-[clamp(64px,10vw,180px)] leading-[0.9]">
-                    hire your <br/><span className="italic" style={{ color: SOFT.pink }}>first five.</span>
-                  </h2>
-                  <div className="mt-10 flex items-center gap-4">
-                    <Link to="/auth" className="group inline-flex items-center gap-3 bg-white text-black pl-6 pr-2 py-2 rounded-full">
-                      <span className="text-[11px] tracking-[0.22em] font-semibold">START FREE</span>
-                      <span className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center group-hover:translate-x-1 transition-transform">
-                        <ArrowRight className="w-4 h-4" />
-                      </span>
-                    </Link>
-                    <Link to="/pricing" className="text-[11px] tracking-[0.22em] font-semibold border border-white/40 rounded-full px-5 py-2.5 hover:bg-white/10">
-                      PLANS
-                    </Link>
+                    <span className="text-[10px] px-2.5 py-1 rounded-full font-medium" style={
+                      t.status === "Completed" ? { background: "oklch(0.93 0.08 150)", color: "oklch(0.4 0.15 150)" } :
+                      t.status === "Review" ? { background: "oklch(0.93 0.08 60)", color: "oklch(0.5 0.18 50)" } :
+                      { background: "oklch(0.93 0.05 285)", color: "oklch(0.45 0.2 285)" }
+                    }>{t.status}</span>
                   </div>
-                </div>
-                <div className="col-span-5 relative h-[80vh]">
-                  <img src={panel3Img} alt="" className="w-full h-full object-cover grayscale" />
-                  <div className="absolute bottom-4 left-4 px-3 py-1.5 text-[10px] tracking-[0.28em]" style={{ background: SOFT.pink, color: "#000" }}>
-                    fin.
-                  </div>
-                </div>
-                <div className="absolute bottom-6 left-12 text-[10px] tracking-[0.32em] opacity-50">
-                  © 2026 Iscilla Technologies · Mythmind — <Link to="/terms" className="underline">terms</Link> · <Link to="/privacy" className="underline">privacy</Link>
-                </div>
+                ))}
               </div>
-            </Panel>
+              <Link to="/ai-employees" className="mt-5 w-full flex items-center justify-between pt-4 border-t border-border/40 text-[11px] tracking-[0.18em] font-semibold">
+                VIEW ALL TASKS <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
 
+            <div className="bg-background rounded-2xl border border-border/40 p-6 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="font-semibold">Performance overview</div>
+                <button className="text-xs text-muted-foreground flex items-center gap-1">This week ▾</button>
+              </div>
+              <div className="text-4xl font-serif">$24,600</div>
+              <div className="text-xs text-muted-foreground mt-1">Revenue impact</div>
+              <div className="text-xs mt-2"><span className="text-green-600 font-medium">↑ 18.6%</span> <span className="text-muted-foreground">vs last week</span></div>
+
+              <svg viewBox="0 0 400 140" className="w-full mt-6">
+                <defs>
+                  <linearGradient id="chart-grad" x1="0" x2="1">
+                    <stop offset="0%" stopColor="oklch(0.55 0.24 285)" />
+                    <stop offset="100%" stopColor="oklch(0.7 0.2 350)" />
+                  </linearGradient>
+                  <linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.7 0.2 320 / 0.3)" />
+                    <stop offset="100%" stopColor="oklch(0.7 0.2 320 / 0)" />
+                  </linearGradient>
+                </defs>
+                <path d="M0,110 C50,100 80,80 130,85 C180,90 220,60 270,45 C320,30 360,25 400,20 L400,140 L0,140 Z" fill="url(#chart-fill)" />
+                <path d="M0,110 C50,100 80,80 130,85 C180,90 220,60 270,45 C320,30 360,25 400,20" stroke="url(#chart-grad)" strokeWidth="2.5" fill="none" />
+                <circle cx="320" cy="30" r="6" fill="oklch(0.7 0.2 350)" />
+                <circle cx="320" cy="30" r="10" fill="oklch(0.7 0.2 350 / 0.3)" />
+              </svg>
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => <span key={d}>{d}</span>)}
+              </div>
+
+              <div className="absolute right-6 top-24 bg-background border border-border/40 rounded-xl p-3 shadow-sm">
+                <div className="text-[10px] text-muted-foreground">Team efficiency</div>
+                <div className="font-serif text-3xl">87%</div>
+                <div className="text-[10px]"><span className="text-green-600">↑ 11%</span> <span className="text-muted-foreground">vs last week</span></div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Local styles */}
-      <style>{`
-        @keyframes spin-slow { to { transform: rotate(360deg); } }
-        .animate-spin-slow { animation: spin-slow 12s linear infinite; }
-      `}</style>
-    </div>
-  );
-}
+      {/* CTA */}
+      <section className="max-w-[1240px] mx-auto px-8 py-16">
+        <div className="rounded-3xl p-12 relative overflow-hidden" style={{ background: "oklch(0.13 0.02 270)" }}>
+          <div className="absolute right-0 bottom-0 w-1/2 h-full opacity-60"
+               style={{ background: "radial-gradient(ellipse at right, oklch(0.5 0.25 320 / 0.4), transparent 70%)" }} />
+          <div className="relative flex items-center justify-between flex-wrap gap-8">
+            <div>
+              <h3 className="font-serif text-4xl text-white leading-tight">
+                Not just AI.<br />An AI workforce.
+              </h3>
+              <Link to="/ai-employees" className="mt-8 inline-flex w-12 h-12 rounded-full bg-white/10 backdrop-blur items-center justify-center text-white">
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex -space-x-3">
+                {agents.slice(0,4).map((a) => (
+                  <div key={a.id} className="w-10 h-10 rounded-full border-2 overflow-hidden" style={{ borderColor: "oklch(0.13 0.02 270)" }}>
+                    <img src={a.image} alt={a.name} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="text-white/80 text-sm leading-relaxed max-w-[220px]">
+                Trusted by forward-thinking teams building what's next.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-function Panel({ children, bg, text }: { children: React.ReactNode; bg: string; text?: string }) {
-  return (
-    <section
-      className="h-screen flex-shrink-0 relative"
-      style={{ width: "100vw", background: bg, color: text ?? "#000" }}
-    >
-      {children}
-    </section>
-  );
-}
-
-function Row({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-4">
-      <div className="font-serif text-2xl w-8 shrink-0">{n}</div>
-      <div>
-        <div className="font-serif text-2xl">{title}</div>
-        <div className="text-neutral-600 mt-1">{children}</div>
-      </div>
+      <SiteFooter />
     </div>
   );
 }
