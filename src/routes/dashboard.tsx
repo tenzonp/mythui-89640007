@@ -29,6 +29,14 @@ export const Route = createFileRoute("/dashboard")({
 
 type Profile = { display_name: string | null; email: string | null; avatar_url: string | null };
 
+function timeAgo(d: Date) {
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 const sidebarLinks = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/chat", label: "Chat", icon: MessageSquare },
@@ -45,6 +53,9 @@ function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan] = useState<any>(null);
   const [tasksCompleted, setTasksCompleted] = useState<number>(0);
+  const [recentTasks, setRecentTasks] = useState<
+    { id: string; title: string; agent: string; time: string; status: string }[]
+  >([]);
   const fetchPlan = useServerFn(getMyPlan);
 
   useEffect(() => {
@@ -67,6 +78,36 @@ function Dashboard() {
         .eq("user_id", user.id)
         .eq("role", "assistant")
         .then(({ count }) => setTasksCompleted(count ?? 0));
+      supabase
+        .from("messages")
+        .select("id, parts, created_at, thread_id, threads(title)")
+        .eq("user_id", user.id)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(6)
+        .then(({ data }) => {
+          if (!data) return;
+          const items = data.map((m: any) => {
+            const parts = Array.isArray(m.parts) ? m.parts : [];
+            const toolPart = parts.find((p: any) => typeof p?.type === "string" && p.type.startsWith("tool-"));
+            const textPart = [...parts].reverse().find((p: any) => p?.type === "text" && p.text);
+            const toolName = toolPart?.type?.replace("tool-", "").replace(/_/g, " ");
+            const title = textPart?.text
+              ? String(textPart.text).slice(0, 90)
+              : toolName
+                ? `Ran ${toolName}`
+                : m.threads?.title || "AI task";
+            const running = toolPart && toolPart.state !== "output-available" && toolPart.state !== "done";
+            return {
+              id: m.id,
+              title,
+              agent: toolName ? `Tool · ${toolName}` : "Assistant",
+              time: timeAgo(new Date(m.created_at)),
+              status: running ? "in-progress" : "done",
+            };
+          });
+          setRecentTasks(items);
+        });
     };
     load();
     const t = setInterval(load, 5000);
@@ -108,13 +149,6 @@ function Dashboard() {
     { label: "Hours saved", value: `${hoursSaved}h`, icon: Clock, trend: `${HUMAN_MIN - AI_MIN}m per task` },
   ];
 
-  const recentTasks = [
-    { title: "Q3 marketing plan drafted by Nova", agent: "Nova", time: "2m ago", status: "done" },
-    { title: "Customer churn analysis by Orion", agent: "Orion", time: "15m ago", status: "done" },
-    { title: "Blog post SEO optimized by Iris", agent: "Iris", time: "32m ago", status: "done" },
-    { title: "Sales pipeline review by Atlas", agent: "Atlas", time: "1h ago", status: "in-progress" },
-    { title: "User feedback summary by Echo", agent: "Echo", time: "2h ago", status: "done" },
-  ];
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -286,8 +320,11 @@ function Dashboard() {
               <div>
                 <h2 className="font-serif text-2xl mb-5">Recent work</h2>
                 <div className="rounded-xl border bg-card p-5 space-y-4">
+                  {recentTasks.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No work yet — start a chat to put your AI team to work.</p>
+                  )}
                   {recentTasks.map((task) => (
-                    <div key={task.title} className="flex items-start gap-3">
+                    <div key={task.id} className="flex items-start gap-3">
                       <div
                         className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
                           task.status === "done" ? "bg-green-500" : "bg-amber-500"
