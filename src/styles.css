@@ -128,5 +128,11 @@
 .animate-float { animation: float-soft 4s ease-in-out infinite; }
 .animate-pulse-dot { animation: pulse-dot 2.4s ease-in-out infinite; }
 
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+.animate-marquee { animation: marquee 30s linear infinite; }
+
 .text-violet { color: var(--violet); }
 .bg-violet { background-color: var(--violet); }
