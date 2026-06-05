@@ -37,6 +37,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AiEmployeesAgentIdRouteImport } from './routes/ai-employees.$agentId'
 import { Route as ApiFilesSplatRouteImport } from './routes/api/files/$'
 import { Route as ApiPublicInstagramWebhookRouteImport } from './routes/api/public/instagram/webhook'
+import { Route as ApiPublicInstagramMediaSplatRouteImport } from './routes/api/public/instagram-media/$'
 import { Route as ApiPublicDodoWebhookRouteImport } from './routes/api/public/dodo/webhook'
 
 const TermsRoute = TermsRouteImport.update({
@@ -180,6 +181,12 @@ const ApiPublicInstagramWebhookRoute =
     path: '/api/public/instagram/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicInstagramMediaSplatRoute =
+  ApiPublicInstagramMediaSplatRouteImport.update({
+    id: '/api/public/instagram-media/$',
+    path: '/api/public/instagram-media/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDodoWebhookRoute = ApiPublicDodoWebhookRouteImport.update({
   id: '/api/public/dodo/webhook',
   path: '/api/public/dodo/webhook',
@@ -215,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
   '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
+  '/api/public/instagram-media/$': typeof ApiPublicInstagramMediaSplatRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -245,6 +253,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
   '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
+  '/api/public/instagram-media/$': typeof ApiPublicInstagramMediaSplatRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRoutesById {
@@ -277,6 +286,7 @@ export interface FileRoutesById {
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
   '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
+  '/api/public/instagram-media/$': typeof ApiPublicInstagramMediaSplatRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -310,6 +320,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/api/files/$'
     | '/api/public/dodo/webhook'
+    | '/api/public/instagram-media/$'
     | '/api/public/instagram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/api/files/$'
     | '/api/public/dodo/webhook'
+    | '/api/public/instagram-media/$'
     | '/api/public/instagram/webhook'
   id:
     | '__root__'
@@ -371,6 +383,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/api/files/$'
     | '/api/public/dodo/webhook'
+    | '/api/public/instagram-media/$'
     | '/api/public/instagram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -399,6 +412,7 @@ export interface RootRouteChildren {
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
   ApiFilesSplatRoute: typeof ApiFilesSplatRoute
   ApiPublicDodoWebhookRoute: typeof ApiPublicDodoWebhookRoute
+  ApiPublicInstagramMediaSplatRoute: typeof ApiPublicInstagramMediaSplatRoute
   ApiPublicInstagramWebhookRoute: typeof ApiPublicInstagramWebhookRoute
 }
 
@@ -600,6 +614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInstagramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/instagram-media/$': {
+      id: '/api/public/instagram-media/$'
+      path: '/api/public/instagram-media/$'
+      fullPath: '/api/public/instagram-media/$'
+      preLoaderRoute: typeof ApiPublicInstagramMediaSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/dodo/webhook': {
       id: '/api/public/dodo/webhook'
       path: '/api/public/dodo/webhook'
@@ -668,8 +689,19 @@ const rootRouteChildren: RootRouteChildren = {
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
   ApiFilesSplatRoute: ApiFilesSplatRoute,
   ApiPublicDodoWebhookRoute: ApiPublicDodoWebhookRoute,
+  ApiPublicInstagramMediaSplatRoute: ApiPublicInstagramMediaSplatRoute,
   ApiPublicInstagramWebhookRoute: ApiPublicInstagramWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
