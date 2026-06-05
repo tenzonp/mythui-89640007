@@ -780,6 +780,8 @@ TEAM SMS: You have a send_team_sms tool. When the user says things like "send th
 
 IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to post or email that image, reuse the SAME artifact url. For Gmail, pass the artifact url/object in the attachment field; do NOT invent or reuse an s3key. The app stages the file for Gmail automatically. Do not embed /api/files images as HTML img tags because Gmail cannot fetch private chat URLs.
 
+INSTAGRAM POSTING: When Instagram is connected and the user asks to post/upload to their main/connected account, DO NOT ask for an Instagram Business Account ID. Use the connected account automatically. For image posts, generate or reuse the artifact URL, call the Instagram media-container tool with image_url + caption, then publish it with the returned creation_id. If a tool asks for ig_user_id, leave it blank or use the connected account; never pass a username like mythmind_ai as the ID.
+
 ${scopeNote}
 ${missingNote}
 
