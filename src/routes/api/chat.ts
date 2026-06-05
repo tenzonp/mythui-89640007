@@ -597,6 +597,20 @@ function detectFacebookPermissionError(result: any): boolean {
   }
 }
 
+function redactSensitiveFields(value: any): any {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(redactSensitiveFields);
+  const out: Record<string, any> = {};
+  for (const [key, nested] of Object.entries(value)) {
+    if (/access[_-]?token|refresh[_-]?token|client[_-]?secret|authorization/i.test(key)) {
+      out[key] = "[redacted]";
+    } else {
+      out[key] = redactSensitiveFields(nested);
+    }
+  }
+  return out;
+}
+
 async function postToFacebookPageDirect(args: any, userId: string) {
   const page = await resolveConnectedFacebookPage(userId, args?.page_id);
   if (!page.accessToken) {
@@ -702,7 +716,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin
               raw: res,
             };
           }
-          return res;
+          return isFacebook ? redactSensitiveFields(res) : res;
         } catch (e: any) {
           const msg = String(e?.message ?? e);
           if (isInstagram && (msg.includes("2534022") || /24.?hour/i.test(msg))) {
