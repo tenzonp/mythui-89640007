@@ -671,6 +671,89 @@ async function readFileReference(value: any) {
   return null;
 }
 
+function exactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function hasImageMagic(bytes: Uint8Array) {
+  const isPng =
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  return { isPng, isJpeg };
+}
+
+function flattenAlphaToWhite(data: Uint8Array) {
+  const out = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3] / 255;
+    out[i] = Math.round(data[i] * alpha + 255 * (1 - alpha));
+    out[i + 1] = Math.round(data[i + 1] * alpha + 255 * (1 - alpha));
+    out[i + 2] = Math.round(data[i + 2] * alpha + 255 * (1 - alpha));
+    out[i + 3] = 255;
+  }
+  return out;
+}
+
+async function encodeInstagramJpeg(file: { bytes: Uint8Array; name: string; mimetype: string }) {
+  const mime = file.mimetype.split(";")[0].toLowerCase();
+  const lower = file.name.toLowerCase();
+  const magic = hasImageMagic(file.bytes);
+  let rgba: Uint8Array;
+  let width = 0;
+  let height = 0;
+
+  if (mime === "image/png" || lower.endsWith(".png") || magic.isPng) {
+    const mod: any = await import("@pdf-lib/upng");
+    const UPNG = mod.default ?? mod;
+    const decoded = UPNG.decode(exactArrayBuffer(file.bytes));
+    const frame = UPNG.toRGBA8(decoded)?.[0];
+    if (!frame) throw new Error("Instagram image conversion failed: PNG had no frame.");
+    rgba = new Uint8Array(frame);
+    width = decoded.width;
+    height = decoded.height;
+  } else if (mime === "image/jpeg" || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || magic.isJpeg) {
+    const jpegMod: any = await import("jpeg-js");
+    const jpeg = jpegMod.default ?? jpegMod;
+    const decoded = jpeg.decode(file.bytes, {
+      useTArray: true,
+      formatAsRGBA: true,
+      maxResolutionInMP: 25,
+      maxMemoryUsageInMB: 256,
+    });
+    rgba = decoded.data;
+    width = decoded.width;
+    height = decoded.height;
+  } else {
+    throw new Error("Instagram image posting supports PNG or JPEG files only.");
+  }
+
+  const jpegMod: any = await import("jpeg-js");
+  const jpeg = jpegMod.default ?? jpegMod;
+  const flattened = flattenAlphaToWhite(rgba);
+  const encoded = jpeg.encode({ data: flattened, width, height }, 90);
+  return new Uint8Array(encoded.data);
+}
+
+async function prepareInstagramImageUrl(value: any, userId: string, origin: string) {
+  const absolute = absolutizeUrl(value, origin);
+  const file = await readFileReference(absolute);
+  if (!file) return absolute;
+  const looksLikeImage = file.mimetype.startsWith("image/") || Object.values(hasImageMagic(file.bytes)).some(Boolean);
+  if (!looksLikeImage) return absolute;
+
+  const bytes = await encodeInstagramJpeg(file);
+  if (bytes.byteLength > 8 * 1024 * 1024) {
+    throw new Error("Instagram image is too large after conversion (max 8MB).");
+  }
+  const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 70) || "image";
+  const path = `${userId}/instagram/${Date.now()}-${base}.jpg`;
+  const { error } = await supabaseAdmin.storage
+    .from("artifacts")
+    .upload(path, bytes, { contentType: "image/jpeg", upsert: false });
+  if (error) throw new Error(error.message);
+  return `${origin}/api/files/${encodeURIComponent(path)}`;
+}
+
 function findStoredImageUrlInHtml(args: any): string | null {
   const body = String(args?.body || args?.message_body || "");
   const match = body.match(/<img[^>]+src=["']([^"']*\/api\/files\/[^"']+)["'][^>]*>/i);
@@ -687,7 +770,8 @@ async function prepareComposioArgs(t: ComposioTool, args: any, userId: string, o
       next.ig_user_id = account.id;
     }
     for (const key of ["image_url", "video_url", "cover_url"]) {
-      if (next[key]) next[key] = absolutizeUrl(next[key], origin);
+      if (!next[key]) continue;
+      next[key] = key === "video_url" ? absolutizeUrl(next[key], origin) : await prepareInstagramImageUrl(next[key], userId, origin);
     }
     return next;
   }
@@ -780,7 +864,7 @@ TEAM SMS: You have a send_team_sms tool. When the user says things like "send th
 
 IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to post or email that image, reuse the SAME artifact url. For Gmail, pass the artifact url/object in the attachment field; do NOT invent or reuse an s3key. The app stages the file for Gmail automatically. Do not embed /api/files images as HTML img tags because Gmail cannot fetch private chat URLs.
 
-INSTAGRAM POSTING: When Instagram is connected and the user asks to post/upload to their main/connected account, DO NOT ask for an Instagram Business Account ID. Use the connected account automatically. For image posts, generate or reuse the artifact URL, call the Instagram media-container tool with image_url + caption, then publish it with the returned creation_id. If a tool asks for ig_user_id, leave it blank or use the connected account; never pass a username like mythmind_ai as the ID.
+INSTAGRAM POSTING: When Instagram is connected and the user asks to post/upload to their main/connected account, DO NOT ask for an Instagram Business Account ID. Use the connected account automatically. For image posts, generate or reuse the artifact URL, call the Instagram media-container tool with image_url + caption, then publish it with the returned creation_id. Local/generated PNG files are automatically converted to Instagram-ready JPEG URLs, so do not regenerate repeatedly after an unsupported-format error. If a tool asks for ig_user_id, leave it blank or use the connected account; never pass a username like mythmind_ai as the ID.
 
 ${scopeNote}
 ${missingNote}
