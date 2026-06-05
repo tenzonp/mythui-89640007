@@ -677,8 +677,20 @@ function findStoredImageUrlInHtml(args: any): string | null {
   return match?.[1] ?? null;
 }
 
-async function prepareComposioArgs(t: ComposioTool, args: any) {
+async function prepareComposioArgs(t: ComposioTool, args: any, userId: string, origin: string) {
   const toolkit = (t.toolkit?.slug ?? "").toLowerCase();
+  if (toolkit === "instagram") {
+    const next = { ...(args ?? {}) };
+    const needsAccountId = Boolean((t.input_parameters as any)?.properties?.ig_user_id);
+    if (needsAccountId && (!next.ig_user_id || !/^\d+$/.test(String(next.ig_user_id)))) {
+      const account = await resolveConnectedInstagramAccount(userId);
+      next.ig_user_id = account.id;
+    }
+    for (const key of ["image_url", "video_url", "cover_url"]) {
+      if (next[key]) next[key] = absolutizeUrl(next[key], origin);
+    }
+    return next;
+  }
   if (toolkit !== "gmail") return args ?? {};
   const next = { ...(args ?? {}) };
   const attachmentSource = next.attachment ?? findStoredImageUrlInHtml(next);
