@@ -684,11 +684,38 @@ function ChatWindow({
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking…
               </div>
             )}
-            {error && (
-              <div className="text-sm text-destructive border border-destructive/30 rounded-lg p-3">
-                {error.message}
-              </div>
-            )}
+            {error && (() => {
+              let parsed: any = null;
+              try { parsed = JSON.parse(error.message); } catch {}
+              if (parsed?.code === "insufficient_credits" || parsed?.code === "plan_locked") {
+                return (
+                  <div className="rounded-2xl border border-violet/30 bg-gradient-to-br from-violet/5 to-white p-4 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-violet shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm">
+                        {parsed.code === "plan_locked" ? "This model needs an upgrade" : "You've run out of credits"}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {parsed.code === "plan_locked"
+                          ? "Upgrade your plan to unlock this Wynsa model."
+                          : `Your balance is ${parsed.balance ?? 0}. Upgrade for more monthly credits or wait for your next daily refill.`}
+                      </div>
+                      <Link
+                        to="/billing"
+                        className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-violet text-white text-xs font-medium hover:bg-violet/90"
+                      >
+                        Upgrade plan <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="text-sm text-destructive border border-destructive/30 rounded-lg p-3">
+                  {error.message}
+                </div>
+              );
+            })()}
           </div>
         )}
         {tab === "files" && <FilesPane files={files} />}
