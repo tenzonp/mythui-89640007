@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createHmac } from "crypto";
 import {
   convertToModelMessages,
   jsonSchema,
@@ -634,6 +635,16 @@ function guessMimeFromName(name: string): string {
   return "application/octet-stream";
 }
 
+function instagramMediaSecret() {
+  return process.env.LOVABLE_API_KEY || process.env.COMPOSIO_API_KEY || "";
+}
+
+function signInstagramMediaPath(path: string) {
+  const secret = instagramMediaSecret();
+  if (!secret) throw new Error("Instagram media signing is not configured.");
+  return createHmac("sha256", secret).update(path).digest("base64url");
+}
+
 function storagePathFromFileUrl(value: string): string | null {
   try {
     const u = new URL(value, "https://app.local");
@@ -751,7 +762,8 @@ async function prepareInstagramImageUrl(value: any, userId: string, origin: stri
     .from("artifacts")
     .upload(path, bytes, { contentType: "image/jpeg", upsert: false });
   if (error) throw new Error(error.message);
-  return `${origin}/api/files/${encodeURIComponent(path)}`;
+  const sig = signInstagramMediaPath(path);
+  return `${origin}/api/public/instagram-media/${encodeURIComponent(path)}?sig=${encodeURIComponent(sig)}`;
 }
 
 function findStoredImageUrlInHtml(args: any): string | null {
