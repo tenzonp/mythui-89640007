@@ -934,13 +934,9 @@ async function prepareComposioArgs(t: ComposioTool, args: any, userId: string, o
   if (toolkit === "facebook") {
     const next = { ...(args ?? {}) };
     const hasPageIdParam = Boolean((t.input_parameters as any)?.properties?.page_id);
-    if (hasPageIdParam && (!next.page_id || !/^\d+$/.test(String(next.page_id)))) {
-      try {
-        const page = await resolveConnectedFacebookPage(userId);
-        next.page_id = page.id;
-      } catch (e) {
-        // leave as-is; tool will error and AI can surface it
-      }
+    if (hasPageIdParam) {
+      const page = await resolveConnectedFacebookPage(userId, next.page_id);
+      next.page_id = page.id;
     }
     for (const key of ["image_url", "video_url", "url", "source"]) {
       if (next[key]) next[key] = absolutizeUrl(next[key], origin);
