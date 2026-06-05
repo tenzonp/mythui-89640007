@@ -1664,6 +1664,111 @@ function WebsiteBuildCard({ part }: { part: any }) {
   );
 }
 
+const STEP_CODE_LINES: Record<string, string[]> = {
+  brief: [
+    "// Reading brief & business knowledge",
+    "const brief = await loadBrief(threadId);",
+    "const knowledge = await fetchBusinessProfile();",
+    "const audience = analyze(brief.tone, knowledge.voice);",
+    "→ understood: tone='premium', sector='tea'",
+  ],
+  design: [
+    "// Designing layout & visual system",
+    "const palette = pickPalette('warm-earth', 'noir-gold');",
+    "const type = pair('Cormorant', 'Inter');",
+    "const layout = compose([hero, story, products, cta]);",
+    "→ system: 12-col · radii: 14 · motion: gentle",
+  ],
+  code: [
+    "// Writing HTML, CSS & JS",
+    "<section class=\"hero relative overflow-hidden\">",
+    "  <h1 class=\"font-serif text-6xl tracking-tight\">",
+    "    A quiet ritual, brewed with care.",
+    "  </h1>",
+    "</section>",
+    "@keyframes fadeUp { from { opacity:0; transform: translateY(8px); } }",
+  ],
+  assets: [
+    "// Sourcing imagery & icons",
+    "const hero = await sourceImage('steaming chai, soft light');",
+    "const icons = lucide(['leaf','flame','cup-soda']);",
+    "→ optimized 6 images · webp · lazy-loaded",
+  ],
+  zip: [
+    "// Packaging static bundle",
+    "zip.file('index.html', html);",
+    "zip.file('styles.css', css);",
+    "zip.file('script.js', js);",
+    "→ bundle ready · 142 KB",
+  ],
+  deploy: [
+    "// Deploying to Netlify",
+    "POST /api/v1/sites { name, files }",
+    "uploading deploy archive…",
+    "polling deploy state…",
+    "→ state: ready",
+  ],
+};
+
+function BuildConsole({ stepKey, siteName }: { stepKey: string; siteName?: string }) {
+  const lines = STEP_CODE_LINES[stepKey] ?? STEP_CODE_LINES.code;
+  const [typed, setTyped] = useState<string[]>([]);
+  const [cursor, setCursor] = useState("");
+
+  useEffect(() => {
+    setTyped([]);
+    setCursor("");
+    let cancelled = false;
+    let lineIdx = 0;
+    let charIdx = 0;
+    const tick = () => {
+      if (cancelled) return;
+      const current = lines[lineIdx] ?? "";
+      if (charIdx <= current.length) {
+        setCursor(current.slice(0, charIdx));
+        charIdx += Math.max(1, Math.round(current.length / 30));
+        setTimeout(tick, 28);
+      } else {
+        setTyped((t) => [...t, current]);
+        setCursor("");
+        charIdx = 0;
+        lineIdx = (lineIdx + 1) % lines.length;
+        setTimeout(tick, 280);
+      }
+    };
+    const id = setTimeout(tick, 120);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [stepKey]);
+
+  return (
+    <div className="relative px-4 py-3 border-b">
+      <div className="rounded-lg bg-[#0d1117] text-[#e6edf3] font-mono text-[11px] leading-relaxed p-3 overflow-hidden">
+        <div className="flex items-center gap-1.5 mb-2 opacity-70">
+          <span className="w-2 h-2 rounded-full bg-[#ff5f57]" />
+          <span className="w-2 h-2 rounded-full bg-[#febc2e]" />
+          <span className="w-2 h-2 rounded-full bg-[#28c840]" />
+          <span className="ml-2 text-[10px] tracking-wider">
+            reyes@mythmind ~ {siteName ?? "site"}
+          </span>
+        </div>
+        <div className="max-h-32 overflow-hidden">
+          {typed.slice(-4).map((l, i) => (
+            <div key={`${stepKey}-${typed.length - 4 + i}`} className="whitespace-pre">
+              <span className="text-[#7d8590]">{String(typed.length - 4 + i + 1).padStart(2, "0")} </span>
+              <span>{l}</span>
+            </div>
+          ))}
+          <div className="whitespace-pre">
+            <span className="text-[#7d8590]">{String(typed.length + 1).padStart(2, "0")} </span>
+            <span>{cursor}</span>
+            <span className="inline-block w-1.5 h-3 bg-[#e6edf3] align-middle animate-pulse ml-0.5" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArtifactCard({ a }: { a: any }) {
   const isImage = (a.mime ?? "").startsWith("image/") || a.isImage;
   const isPdf = (a.mime ?? "").includes("pdf") || a.isPdf;
