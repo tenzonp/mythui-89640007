@@ -533,6 +533,21 @@ async function resolveConnectedInstagramAccount(userId: string) {
   };
 }
 
+async function resolveConnectedFacebookPage(userId: string): Promise<{ id: string; name?: string | null }> {
+  const res = await executeTool("FACEBOOK_GET_USER_PAGES", userId, {});
+  const data = (res as any)?.data ?? res;
+  const pages =
+    (data?.data && Array.isArray(data.data) && data.data) ||
+    (Array.isArray(data) && data) ||
+    (data?.pages && Array.isArray(data.pages) && data.pages) ||
+    [];
+  const first = pages[0];
+  const id = first?.id || firstStringByKeys(data, ["page_id", "id"]);
+  if (!id) throw new Error("No Facebook Page found on the connected account.");
+  return { id: String(id), name: first?.name ?? null };
+}
+
+
 function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
