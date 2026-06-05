@@ -467,6 +467,18 @@ function createPendingInstagramReplyTool(userId: string) {
 
 function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
   const schema = raw?.type ? { ...raw } : { type: "object", properties: raw ?? {} };
+  if (toolkitSlug?.toLowerCase() === "instagram" && schema.properties?.ig_user_id) {
+    schema.properties = { ...schema.properties };
+    schema.properties.ig_user_id = {
+      ...schema.properties.ig_user_id,
+      description:
+        "Optional. Leave blank to use the Instagram Business Account already connected in Integrations. Do not ask the user for this ID when Instagram is connected.",
+    };
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.filter((key: string) => key !== "ig_user_id");
+      if (!schema.required.length) delete schema.required;
+    }
+  }
   if (toolkitSlug?.toLowerCase() === "gmail" && schema.properties?.attachment) {
     schema.properties = { ...schema.properties };
     schema.properties.attachment = {
@@ -485,7 +497,30 @@ function normalizeToolInputSchema(raw: any, toolkitSlug?: string) {
   return schema;
 }
 
-function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
+function firstStringByKeys(value: any, keys: string[]): string | null {
+  return extractByKeys(value, keys.map((k) => k.toLowerCase()));
+}
+
+function absolutizeUrl(value: any, origin: string) {
+  if (typeof value !== "string" || !value.trim()) return value;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/")) return `${origin}${value}`;
+  return value;
+}
+
+async function resolveConnectedInstagramAccount(userId: string) {
+  const res = await executeTool("INSTAGRAM_GET_USER_INFO", userId, {});
+  const data = (res as any)?.data ?? res;
+  const id = firstStringByKeys(data, ["id", "ig_user_id", "instagram_business_account_id"]);
+  if (!id) throw new Error("Connected Instagram account did not return an account ID.");
+  return {
+    id,
+    username: firstStringByKeys(data, ["username"]),
+    accountType: firstStringByKeys(data, ["account_type"]),
+  };
+}
+
+function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string, origin: string) {
   const out: Record<string, any> = {};
   for (const t of tools) {
     const safeName = t.slug.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
@@ -505,7 +540,7 @@ function composioToolsToAiSdkTools(tools: ComposioTool[], userId: string) {
       inputSchema: jsonSchema(schema),
       execute: async (args: any) => {
         try {
-          const preparedArgs = await prepareComposioArgs(t, args ?? {});
+          const preparedArgs = await prepareComposioArgs(t, args ?? {}, userId, origin);
           const res = await executeTool(t.slug, userId, preparedArgs);
           if (isInstagram && detectInstagramWindowClosed(res)) {
             const blocked = buildInstagramWindowResponse(userId, args, res);
@@ -642,8 +677,20 @@ function findStoredImageUrlInHtml(args: any): string | null {
   return match?.[1] ?? null;
 }
 
-async function prepareComposioArgs(t: ComposioTool, args: any) {
+async function prepareComposioArgs(t: ComposioTool, args: any, userId: string, origin: string) {
   const toolkit = (t.toolkit?.slug ?? "").toLowerCase();
+  if (toolkit === "instagram") {
+    const next = { ...(args ?? {}) };
+    const needsAccountId = Boolean((t.input_parameters as any)?.properties?.ig_user_id);
+    if (needsAccountId && (!next.ig_user_id || !/^\d+$/.test(String(next.ig_user_id)))) {
+      const account = await resolveConnectedInstagramAccount(userId);
+      next.ig_user_id = account.id;
+    }
+    for (const key of ["image_url", "video_url", "cover_url"]) {
+      if (next[key]) next[key] = absolutizeUrl(next[key], origin);
+    }
+    return next;
+  }
   if (toolkit !== "gmail") return args ?? {};
   const next = { ...(args ?? {}) };
   const attachmentSource = next.attachment ?? findStoredImageUrlInHtml(next);
@@ -733,20 +780,22 @@ TEAM SMS: You have a send_team_sms tool. When the user says things like "send th
 
 IMAGE GENERATION: You have a generate_image tool powered by Lovable AI (low-cost, high quality). Use it whenever the user wants a NEW image, logo, flag, illustration, poster, banner, avatar, or social-media graphic — do NOT use run_code for image creation. The tool returns an artifact with name and url. ALWAYS render the image inline in your reply using markdown image syntax: ![short alt](URL). If the user wants to post or email that image, reuse the SAME artifact url. For Gmail, pass the artifact url/object in the attachment field; do NOT invent or reuse an s3key. The app stages the file for Gmail automatically. Do not embed /api/files images as HTML img tags because Gmail cannot fetch private chat URLs.
 
+INSTAGRAM POSTING: When Instagram is connected and the user asks to post/upload to their main/connected account, DO NOT ask for an Instagram Business Account ID. Use the connected account automatically. For image posts, generate or reuse the artifact URL, call the Instagram media-container tool with image_url + caption, then publish it with the returned creation_id. If a tool asks for ig_user_id, leave it blank or use the connected account; never pass a username like mythmind_ai as the ID.
+
 ${scopeNote}
 ${missingNote}
 
 Be concise, warm, proactive. Speak in first person as ${agent.name}.`;
 }
 
-async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[]) {
+async function loadAgentTools(userId: string, agent: Agent, activeSlugs: string[], origin: string) {
   const allowedSlugs = agent.toolkits.length
     ? activeSlugs.filter((s) => agent.toolkits.some((t) => t.toLowerCase() === s.toLowerCase()))
     : activeSlugs;
   if (!allowedSlugs.length) return { tools: {}, allowedSlugs };
   try {
     const toolsRes = await listToolsForToolkits(userId, allowedSlugs, 25);
-    const tools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId);
+    const tools = composioToolsToAiSdkTools(toolsRes.items ?? [], userId, origin);
     if (hasInstagram(allowedSlugs)) {
       tools["send_pending_instagram_replies"] = createPendingInstagramReplyTool(userId);
     }
@@ -781,6 +830,7 @@ export const Route = createFileRoute("/api/chat")({
           agentId?: string;
           modelId?: WynsaModelId;
         };
+        const requestOrigin = new URL(request.url).origin;
         if (!Array.isArray(body.messages)) {
           return new Response("messages required", { status: 400 });
         }
@@ -830,7 +880,12 @@ export const Route = createFileRoute("/api/chat")({
           )
           .join("\n");
 
-        const { tools: ownTools, allowedSlugs } = await loadAgentTools(userId, agent, activeSlugs);
+        const { tools: ownTools, allowedSlugs } = await loadAgentTools(
+          userId,
+          agent,
+          activeSlugs,
+          requestOrigin,
+        );
         const aiTools: Record<string, any> = { ...ownTools };
         if (hasInstagram(activeSlugs) && !aiTools.send_pending_instagram_replies) {
           aiTools.send_pending_instagram_replies = createPendingInstagramReplyTool(userId);
@@ -1065,7 +1120,7 @@ export const Route = createFileRoute("/api/chat")({
               const sub = getAgent(parsed.data.employee);
               if (!sub) return { error: `Unknown employee ${parsed.data.employee}` };
 
-              const subLoaded = await loadAgentTools(userId, sub, activeSlugs);
+              const subLoaded = await loadAgentTools(userId, sub, activeSlugs, requestOrigin);
               const missingTools = sub.toolkits.filter(
                 (t) => !activeSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
               );
