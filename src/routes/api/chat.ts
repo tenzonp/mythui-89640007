@@ -828,6 +828,7 @@ export const Route = createFileRoute("/api/chat")({
           agentId?: string;
           modelId?: WynsaModelId;
         };
+        const requestOrigin = new URL(request.url).origin;
         if (!Array.isArray(body.messages)) {
           return new Response("messages required", { status: 400 });
         }
@@ -877,7 +878,12 @@ export const Route = createFileRoute("/api/chat")({
           )
           .join("\n");
 
-        const { tools: ownTools, allowedSlugs } = await loadAgentTools(userId, agent, activeSlugs);
+        const { tools: ownTools, allowedSlugs } = await loadAgentTools(
+          userId,
+          agent,
+          activeSlugs,
+          requestOrigin,
+        );
         const aiTools: Record<string, any> = { ...ownTools };
         if (hasInstagram(activeSlugs) && !aiTools.send_pending_instagram_replies) {
           aiTools.send_pending_instagram_replies = createPendingInstagramReplyTool(userId);
@@ -1112,7 +1118,7 @@ export const Route = createFileRoute("/api/chat")({
               const sub = getAgent(parsed.data.employee);
               if (!sub) return { error: `Unknown employee ${parsed.data.employee}` };
 
-              const subLoaded = await loadAgentTools(userId, sub, activeSlugs);
+              const subLoaded = await loadAgentTools(userId, sub, activeSlugs, requestOrigin);
               const missingTools = sub.toolkits.filter(
                 (t) => !activeSlugs.some((s) => s.toLowerCase() === t.toLowerCase()),
               );
