@@ -39,6 +39,7 @@ import { Route as ApiFilesSplatRouteImport } from './routes/api/files/$'
 import { Route as ApiPublicInstagramWebhookRouteImport } from './routes/api/public/instagram/webhook'
 import { Route as ApiPublicInstagramMediaSplatRouteImport } from './routes/api/public/instagram-media/$'
 import { Route as ApiPublicDodoWebhookRouteImport } from './routes/api/public/dodo/webhook'
+import { Route as ApiPublicAuthGoogleClientIdRouteImport } from './routes/api/public/auth.google-client-id'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -192,6 +193,12 @@ const ApiPublicDodoWebhookRoute = ApiPublicDodoWebhookRouteImport.update({
   path: '/api/public/dodo/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAuthGoogleClientIdRoute =
+  ApiPublicAuthGoogleClientIdRouteImport.update({
+    id: '/api/public/auth/google-client-id',
+    path: '/api/public/auth/google-client-id',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
+  '/api/public/auth/google-client-id': typeof ApiPublicAuthGoogleClientIdRoute
   '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
   '/api/public/instagram-media/$': typeof ApiPublicInstagramMediaSplatRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
@@ -252,6 +260,7 @@ export interface FileRoutesByTo {
   '/ai-employees': typeof AiEmployeesIndexRoute
   '/chat': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
+  '/api/public/auth/google-client-id': typeof ApiPublicAuthGoogleClientIdRoute
   '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
   '/api/public/instagram-media/$': typeof ApiPublicInstagramMediaSplatRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
@@ -285,6 +294,7 @@ export interface FileRoutesById {
   '/ai-employees/': typeof AiEmployeesIndexRoute
   '/chat/': typeof ChatIndexRoute
   '/api/files/$': typeof ApiFilesSplatRoute
+  '/api/public/auth/google-client-id': typeof ApiPublicAuthGoogleClientIdRoute
   '/api/public/dodo/webhook': typeof ApiPublicDodoWebhookRoute
   '/api/public/instagram-media/$': typeof ApiPublicInstagramMediaSplatRoute
   '/api/public/instagram/webhook': typeof ApiPublicInstagramWebhookRoute
@@ -319,6 +329,7 @@ export interface FileRouteTypes {
     | '/ai-employees/'
     | '/chat/'
     | '/api/files/$'
+    | '/api/public/auth/google-client-id'
     | '/api/public/dodo/webhook'
     | '/api/public/instagram-media/$'
     | '/api/public/instagram/webhook'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/ai-employees'
     | '/chat'
     | '/api/files/$'
+    | '/api/public/auth/google-client-id'
     | '/api/public/dodo/webhook'
     | '/api/public/instagram-media/$'
     | '/api/public/instagram/webhook'
@@ -382,6 +394,7 @@ export interface FileRouteTypes {
     | '/ai-employees/'
     | '/chat/'
     | '/api/files/$'
+    | '/api/public/auth/google-client-id'
     | '/api/public/dodo/webhook'
     | '/api/public/instagram-media/$'
     | '/api/public/instagram/webhook'
@@ -411,6 +424,7 @@ export interface RootRouteChildren {
   InviteTokenRoute: typeof InviteTokenRoute
   AiEmployeesIndexRoute: typeof AiEmployeesIndexRoute
   ApiFilesSplatRoute: typeof ApiFilesSplatRoute
+  ApiPublicAuthGoogleClientIdRoute: typeof ApiPublicAuthGoogleClientIdRoute
   ApiPublicDodoWebhookRoute: typeof ApiPublicDodoWebhookRoute
   ApiPublicInstagramMediaSplatRoute: typeof ApiPublicInstagramMediaSplatRoute
   ApiPublicInstagramWebhookRoute: typeof ApiPublicInstagramWebhookRoute
@@ -628,6 +642,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDodoWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/auth/google-client-id': {
+      id: '/api/public/auth/google-client-id'
+      path: '/api/public/auth/google-client-id'
+      fullPath: '/api/public/auth/google-client-id'
+      preLoaderRoute: typeof ApiPublicAuthGoogleClientIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -688,6 +709,7 @@ const rootRouteChildren: RootRouteChildren = {
   InviteTokenRoute: InviteTokenRoute,
   AiEmployeesIndexRoute: AiEmployeesIndexRoute,
   ApiFilesSplatRoute: ApiFilesSplatRoute,
+  ApiPublicAuthGoogleClientIdRoute: ApiPublicAuthGoogleClientIdRoute,
   ApiPublicDodoWebhookRoute: ApiPublicDodoWebhookRoute,
   ApiPublicInstagramMediaSplatRoute: ApiPublicInstagramMediaSplatRoute,
   ApiPublicInstagramWebhookRoute: ApiPublicInstagramWebhookRoute,
