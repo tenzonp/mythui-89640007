@@ -55,11 +55,20 @@ function AuthPage() {
 
   const handleGoogle = async () => {
     setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/dashboard`,
+    // Use Supabase Google OAuth directly with our own client credentials.
+    // redirectTo is dynamic so it works on mythmind.co, Vercel, and previews.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: {
+          access_type: "offline",
+          prompt: "select_account",
+        },
+      },
     });
-    if (result.error) {
-      toast.error(result.error.message ?? "Google sign-in failed");
+    if (error) {
+      toast.error(error.message ?? "Google sign-in failed");
       setBusy(false);
     }
   };
