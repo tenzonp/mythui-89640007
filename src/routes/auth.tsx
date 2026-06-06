@@ -1,12 +1,87 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+            auto_select?: boolean;
+            cancel_on_tap_outside?: boolean;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme?: "outline" | "filled_blue" | "filled_black";
+              size?: "large" | "medium" | "small";
+              type?: "standard" | "icon";
+              shape?: "rectangular" | "pill" | "circle" | "square";
+              text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+              logo_alignment?: "left" | "center";
+              width?: number;
+            },
+          ) => void;
+          prompt: (listener?: (notification: {
+            isNotDisplayed?: () => boolean;
+            isSkippedMoment?: () => boolean;
+            getNotDisplayedReason?: () => string;
+            getSkippedReason?: () => string;
+          }) => void) => void;
+          cancel: () => void;
+        };
+      };
+    };
+  }
+}
+
+let googleIdentityScriptPromise: Promise<void> | null = null;
+
+function loadGoogleIdentityScript() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (googleIdentityScriptPromise) return googleIdentityScriptPromise;
+
+  googleIdentityScriptPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Google sign-in could not load")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Google sign-in could not load"));
+    document.head.appendChild(script);
+  });
+
+  return googleIdentityScriptPromise;
+}
+
+async function getGoogleClientId() {
+  const res = await fetch("/api/public/auth/google-client-id");
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok || typeof body.clientId !== "string") {
+    throw new Error(body.error || "Google sign-in is not configured");
+  }
+
+  return body.clientId;
+}
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in · Mythmind" }] }),
@@ -16,15 +91,78 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && session) navigate({ to: "/dashboard", replace: true });
   }, [session, loading, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function renderGoogleButton() {
+      try {
+        const [clientId] = await Promise.all([getGoogleClientId(), loadGoogleIdentityScript()]);
+        if (cancelled || !googleButtonRef.current || !window.google?.accounts?.id) return;
+
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          callback: async ({ credential }) => {
+            setBusy(true);
+            try {
+              if (!credential) throw new Error("Google did not return a sign-in token");
+
+              const { error } = await supabase.auth.signInWithIdToken({
+                provider: "google",
+                token: credential,
+              });
+
+              if (error) throw error;
+
+              toast.success("Welcome to Mythmind");
+              navigate({ to: "/dashboard", replace: true });
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Google sign-in failed");
+              setBusy(false);
+            }
+          },
+        });
+
+        googleButtonRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          type: "standard",
+          shape: "rectangular",
+          text: "continue_with",
+          logo_alignment: "left",
+          width: 352,
+        });
+        setGoogleReady(true);
+        setGoogleError(null);
+      } catch (err) {
+        if (!cancelled) {
+          setGoogleError(err instanceof Error ? err.message : "Google sign-in is unavailable");
+        }
+      }
+    }
+
+    renderGoogleButton();
+
+    return () => {
+      cancelled = true;
+      window.google?.accounts?.id?.cancel();
+    };
+  }, [navigate]);
 
   const handleEmail = async (e: FormEvent) => {
     e.preventDefault();
@@ -53,26 +191,6 @@ function AuthPage() {
     }
   };
 
-  const handleGoogle = async () => {
-    setBusy(true);
-    // Use Supabase Google OAuth directly with our own client credentials.
-    // redirectTo is dynamic so it works on mythmind.co, Vercel, and previews.
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-        queryParams: {
-          access_type: "offline",
-          prompt: "select_account",
-        },
-      },
-    });
-    if (error) {
-      toast.error(error.message ?? "Google sign-in failed");
-      setBusy(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
       <div className="absolute inset-0 -z-10 opacity-60"
@@ -91,16 +209,18 @@ function AuthPage() {
             : "Hire your first AI employees in seconds."}
         </p>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-6 w-full h-11"
-          onClick={handleGoogle}
-          disabled={busy}
-        >
-          <GoogleIcon />
-          Continue with Google
-        </Button>
+        <div className="mt-6 min-h-11">
+          <div
+            ref={googleButtonRef}
+            className={googleReady && !busy ? "flex w-full justify-center" : "hidden"}
+          />
+          {(!googleReady || busy) && (
+            <Button type="button" variant="outline" className="w-full h-11" disabled>
+              <GoogleIcon />
+              {busy ? "Please wait…" : googleError ? "Google sign-in unavailable" : "Loading Google…"}
+            </Button>
+          )}
+        </div>
 
         <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
           <div className="h-px flex-1 bg-border" />
