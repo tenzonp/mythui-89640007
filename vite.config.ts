@@ -13,8 +13,17 @@ const preset =
   process.env.NITRO_PRESET ??
   (process.env.VERCEL ? "vercel" : "cloudflare-module");
 
+const vercelOutput =
+  preset === "vercel"
+    ? {
+        dir: ".vercel/output",
+        serverDir: ".vercel/output/functions/__server.func",
+        publicDir: ".vercel/output/static",
+      }
+    : undefined;
+
 export default defineConfig({
-  nitro: { preset },
+  nitro: { preset, output: vercelOutput },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

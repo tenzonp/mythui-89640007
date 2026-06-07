@@ -11,6 +11,9 @@
     "lint": "eslint .",
     "format": "prettier --write ."
   },
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/react": "^3.0.195",
